@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAP Theorem — TJIP Phase 02</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a href="index.html" class="site-logo">
+      <span class="logo-dot"></span>TJIP · Phase 02
+    </a>
+    <div class="site-nav-links">
+      <a href="index.html">Classes</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+<header>
+  <div class="eyebrow">Class 02 · Distributed systems</div>
+  <h1>The CAP <em>Theorem</em></h1>
+  <p class="deck">Why every distributed system is forced to make a painful choice — and how understanding that choice changes the way you design everything.</p>
+  <div class="meta">
+    <span>8 minute read</span>
+    <span>Visual guide</span>
+    <span>No prior experience</span>
+  </div>
+</header>
+
+<div class="toc">
+  <div class="toc-title">What's inside</div>
+  <ol>
+    <li><a href="#promise">The impossible promise</a></li>
+    <li><a href="#three">C, A, and P — what they actually mean</a></li>
+    <li><a href="#partition">Why partitions are not optional</a></li>
+    <li><a href="#choice">The real choice: CP or AP</a></li>
+    <li><a href="#cp">CP systems in practice</a></li>
+    <li><a href="#ap">AP systems in practice</a></li>
+    <li><a href="#spectrum">It's a spectrum, not a switch</a></li>
+    <li><a href="#takeaway">The one-line takeaway</a></li>
+  </ol>
+</div>
+
+<p class="lede">You're building a distributed database. You want three things: every read returns the latest write, every request gets a response, and the system survives network failures. Sounds reasonable. Except in 2000, Eric Brewer stood up at a conference and said you can only have two.</p>
+
+<p>This is the CAP theorem — arguably the most important idea in distributed systems. It was conjectured by Brewer and formally proved by Seth Gilbert and Nancy Lynch in 2002. It says that when a network partition happens, a distributed system must choose between <strong>consistency</strong> and <strong>availability</strong>. You cannot have both.</p>
+
+<p>The theorem is often misunderstood, oversimplified, or hand-waved away. Let's actually understand what it means and why it matters for every system design decision you'll ever make.</p>
+
+<h2 id="promise"><span class="num">01</span>The impossible promise</h2>
+
+<p>Imagine you run two database servers, <strong>Node-1</strong> in New York and <strong>Node-2</strong> in London. A user writes <code>balance = $100</code> to Node-1. One second later, another user reads from Node-2. What should they see?</p>
+
+<p>If the network between New York and London is healthy, Node-1 can replicate the write to Node-2 before the read arrives. Everyone's happy. But what if the cable under the Atlantic gets cut? Now Node-2 has stale data, and you face a brutal decision:</p>
+
+<div class="two-col">
+  <div class="card">
+    <h4>Option A: Stay consistent</h4>
+    <p>Node-2 refuses to answer reads until it can confirm it has the latest data. The user gets an error or a timeout. You preserved correctness but sacrificed availability.</p>
+  </div>
+  <div class="card">
+    <h4>Option B: Stay available</h4>
+    <p>Node-2 answers with whatever data it has — possibly stale. The user gets a response, but it might be wrong. You preserved availability but sacrificed consistency.</p>
+  </div>
+</div>
+
+<p>There is no Option C. That's the CAP theorem.</p>
+
+<h2 id="three"><span class="num">02</span>C, A, and P — what they actually mean</h2>
+
+<p>The three letters are precise terms, not vague goals. Getting them wrong is the #1 source of CAP confusion.</p>
+
+<div class="figure">
+  <div class="figure-label">Figure 01 — The three guarantees</div>
+  <svg viewBox="0 0 640 380" xmlns="http://www.w3.org/2000/svg">
+    <!-- Triangle -->
+    <polygon points="320,60 120,320 520,320" fill="none" stroke="var(--rule)" stroke-width="1.5"/>
+
+    <!-- C vertex -->
+    <circle cx="320" cy="60" r="32" fill="var(--s1)"/>
+    <text x="320" y="65" text-anchor="middle" class="svg-text-bold" fill="white" font-size="18">C</text>
+    <text x="320" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">Consistency</text>
+
+    <!-- A vertex -->
+    <circle cx="120" cy="320" r="32" fill="var(--s2)"/>
+    <text x="120" y="325" text-anchor="middle" class="svg-text-bold" fill="white" font-size="18">A</text>
+    <text x="120" y="368" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Availability</text>
+
+    <!-- P vertex -->
+    <circle cx="520" cy="320" r="32" fill="var(--s3)"/>
+    <text x="520" y="325" text-anchor="middle" class="svg-text-bold" fill="white" font-size="18">P</text>
+    <text x="520" y="368" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">Partition</text>
+    <text x="520" y="382" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">Tolerance</text>
+
+    <!-- Edge labels -->
+    <text x="205" y="178" text-anchor="middle" class="svg-text-muted" transform="rotate(-48, 205, 178)">CA — only without partitions</text>
+    <text x="320" y="336" text-anchor="middle" class="svg-text-muted">AP — available but stale</text>
+    <text x="435" y="178" text-anchor="middle" class="svg-text-muted" transform="rotate(48, 435, 178)">CP — correct but may refuse</text>
+
+    <!-- Center text -->
+    <text x="320" y="230" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">Pick two</text>
+    <text x="320" y="248" text-anchor="middle" class="svg-text-muted">(but P is not optional)</text>
+  </svg>
+  <p class="figure-caption">The CAP triangle. Each edge represents a pair of guarantees. Since partition tolerance is mandatory in any real distributed system, the practical choice is between CP and AP.</p>
+</div>
+
+<h3>Consistency (C)</h3>
+
+<p>Every read receives the most recent write or an error. This is <strong>linearizability</strong> — the strictest form of consistency. If you write <code>x = 5</code> and then read <code>x</code>, you must get 5, no matter which node you ask. It's as if there's a single copy of the data, even though there are multiple replicas.</p>
+
+<h3>Availability (A)</h3>
+
+<p>Every request to a non-failing node receives a response — no errors, no timeouts. The system always answers. Note: "non-failing" means the node itself is up. If a node is on fire, no one expects it to respond. But if it's healthy, it must answer every request.</p>
+
+<h3>Partition Tolerance (P)</h3>
+
+<p>The system continues to operate despite arbitrary message loss or delay between nodes. A <strong>network partition</strong> is when some nodes can't talk to each other — the network splits the cluster into isolated groups. Partition tolerance means the system doesn't just crash when this happens.</p>
+
+<h2 id="partition"><span class="num">03</span>Why partitions are not optional</h2>
+
+<p>Here's the key insight that clears up most CAP confusion: <strong>you don't get to choose whether partitions happen.</strong> They happen. Networks fail. Cables get cut. Switches die. Cloud regions lose connectivity. It's not a question of if, but when.</p>
+
+<p class="pullquote">The "pick two out of three" framing is misleading. Since P is mandatory, the real question is: when a partition happens, do you choose C or A?</p>
+
+<p>A system that doesn't tolerate partitions is just a single-node system. The moment you put data on more than one machine connected by a network, you've accepted that the network can fail. So P is always in the picture.</p>
+
+<div class="callout">
+  <div class="callout-label">What about CA systems?</div>
+  A CA system (consistent and available, but not partition-tolerant) is essentially a single-node database like a traditional PostgreSQL or MySQL instance. It's consistent and available — until the network (or the single node) fails. The moment you distribute it, you're in CP or AP territory.
+</div>
+
+<h2 id="choice"><span class="num">04</span>The real choice: CP or AP</h2>
+
+<p>Since partitions are inevitable, every distributed system makes a choice — sometimes explicitly, sometimes by accident — about what happens during a partition.</p>
+
+<div class="figure">
+  <div class="figure-label">Figure 02 — What happens during a partition</div>
+  <svg viewBox="0 0 640 400" xmlns="http://www.w3.org/2000/svg">
+    <!-- Left side: CP -->
+    <text x="160" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">CP System</text>
+    <text x="160" y="48" text-anchor="middle" class="svg-text-muted">Consistent + Partition-tolerant</text>
+
+    <!-- Two nodes -->
+    <circle cx="100" cy="120" r="24" fill="var(--s1)"/>
+    <text x="100" y="125" text-anchor="middle" class="svg-text-bold" fill="white">N1</text>
+    <circle cx="220" cy="120" r="24" fill="var(--s1)"/>
+    <text x="220" y="125" text-anchor="middle" class="svg-text-bold" fill="white">N2</text>
+
+    <!-- Partition line -->
+    <line x1="145" y1="100" x2="175" y2="140" stroke="var(--accent)" stroke-width="3"/>
+    <line x1="145" y1="140" x2="175" y2="100" stroke="var(--accent)" stroke-width="3"/>
+
+    <!-- Client writes to N1 -->
+    <text x="100" y="82" text-anchor="middle" class="svg-text">write x=5</text>
+    <path d="M 100 76 L 100 96" stroke="var(--s1)" stroke-width="1.5" marker-end="url(#arrow-s1)"/>
+
+    <!-- Client reads from N2 -->
+    <text x="220" y="82" text-anchor="middle" class="svg-text">read x?</text>
+    <path d="M 220 76 L 220 96" stroke="var(--s1)" stroke-width="1.5"/>
+
+    <!-- N2 response -->
+    <rect x="170" y="170" width="100" height="32" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1"/>
+    <text x="220" y="191" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">ERROR</text>
+    <text x="160" y="226" text-anchor="middle" class="svg-text-muted">N2 refuses to answer</text>
+    <text x="160" y="242" text-anchor="middle" class="svg-text-muted">until partition heals</text>
+
+    <!-- Right side: AP -->
+    <text x="480" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">AP System</text>
+    <text x="480" y="48" text-anchor="middle" class="svg-text-muted">Available + Partition-tolerant</text>
+
+    <!-- Two nodes -->
+    <circle cx="420" cy="120" r="24" fill="var(--s2)"/>
+    <text x="420" y="125" text-anchor="middle" class="svg-text-bold" fill="white">N1</text>
+    <circle cx="540" cy="120" r="24" fill="var(--s2)"/>
+    <text x="540" y="125" text-anchor="middle" class="svg-text-bold" fill="white">N2</text>
+
+    <!-- Partition line -->
+    <line x1="465" y1="100" x2="495" y2="140" stroke="var(--accent)" stroke-width="3"/>
+    <line x1="465" y1="140" x2="495" y2="100" stroke="var(--accent)" stroke-width="3"/>
+
+    <!-- Client writes to N1 -->
+    <text x="420" y="82" text-anchor="middle" class="svg-text">write x=5</text>
+    <path d="M 420 76 L 420 96" stroke="var(--s2)" stroke-width="1.5"/>
+
+    <!-- Client reads from N2 -->
+    <text x="540" y="82" text-anchor="middle" class="svg-text">read x?</text>
+    <path d="M 540 76 L 540 96" stroke="var(--s2)" stroke-width="1.5"/>
+
+    <!-- N2 response -->
+    <rect x="490" y="170" width="100" height="32" rx="4" fill="var(--s3-soft)" stroke="var(--s3)" stroke-width="1"/>
+    <text x="540" y="191" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">x = 3</text>
+    <text x="480" y="226" text-anchor="middle" class="svg-text-muted">N2 answers with</text>
+    <text x="480" y="242" text-anchor="middle" class="svg-text-muted">stale data</text>
+
+    <!-- Bottom comparison -->
+    <line x1="40" y1="280" x2="600" y2="280" stroke="var(--rule)" stroke-width="1"/>
+    <text x="160" y="310" text-anchor="middle" class="svg-text-bold">Correct but sometimes unavailable</text>
+    <text x="480" y="310" text-anchor="middle" class="svg-text-bold">Always responds but sometimes wrong</text>
+
+    <text x="160" y="340" text-anchor="middle" class="svg-text-muted">Banks, inventory systems,</text>
+    <text x="160" y="356" text-anchor="middle" class="svg-text-muted">leader election</text>
+    <text x="480" y="340" text-anchor="middle" class="svg-text-muted">Social feeds, DNS, shopping</text>
+    <text x="480" y="356" text-anchor="middle" class="svg-text-muted">carts, caching layers</text>
+  </svg>
+  <p class="figure-caption">During a network partition, a CP system refuses to answer rather than return stale data. An AP system always answers but may return outdated values. Neither is universally "better" — the right choice depends on what your application can tolerate.</p>
+</div>
+
+<h2 id="cp"><span class="num">05</span>CP systems in practice</h2>
+
+<p>A CP system prioritizes correctness. During a partition, nodes that can't confirm they have the latest data will refuse requests rather than risk serving stale reads.</p>
+
+<p><strong>How it works:</strong> Most CP systems use a consensus protocol — like Raft or Paxos — where a majority of nodes must agree before a write is committed. If a partition isolates a minority of nodes, those nodes stop accepting writes. Reads from the minority may also be rejected to prevent stale results.</p>
+
+<h3>Real-world CP systems</h3>
+
+<div class="two-col">
+  <div class="card">
+    <h4>ZooKeeper</h4>
+    <p>Used for distributed coordination — leader election, config management, distributed locks. Correctness is everything here. A wrong answer from ZooKeeper could cause two nodes to both think they're the leader.</p>
+  </div>
+  <div class="card">
+    <h4>etcd / Consul</h4>
+    <p>Service discovery and configuration stores. They use Raft consensus and will become unavailable to minority partitions rather than serve stale service registry data.</p>
+  </div>
+</div>
+
+<p><strong>When to choose CP:</strong> when a wrong answer is worse than no answer. Financial transactions, distributed locks, leader election, inventory counts — anywhere that stale data leads to real damage.</p>
+
+<h2 id="ap"><span class="num">06</span>AP systems in practice</h2>
+
+<p>An AP system prioritizes responsiveness. Every healthy node answers every request, even if it might be serving slightly outdated data. When the partition heals, nodes reconcile their differences.</p>
+
+<p><strong>How it works:</strong> AP systems typically use <strong>eventual consistency</strong>. Writes are accepted by any node and asynchronously replicated. During a partition, different nodes may have different versions of the data. After the partition heals, a conflict resolution strategy — last-write-wins, vector clocks, or application-level merge — brings things back in sync.</p>
+
+<h3>Real-world AP systems</h3>
+
+<div class="two-col">
+  <div class="card">
+    <h4>Cassandra</h4>
+    <p>Distributed database designed for high availability. Every node can accept writes. Uses tunable consistency — you can dial between AP and CP on a per-query basis by adjusting quorum sizes.</p>
+  </div>
+  <div class="card">
+    <h4>DynamoDB</h4>
+    <p>Amazon's key-value store, born from the Dynamo paper. Defaults to eventual consistency for reads (AP), but offers strongly consistent reads as an option (trading some availability).</p>
+  </div>
+</div>
+
+<p><strong>When to choose AP:</strong> when no answer is worse than a slightly stale answer. Social media feeds, DNS lookups, shopping carts, caching layers, real-time analytics — places where showing slightly old data is far better than showing nothing.</p>
+
+<h2 id="spectrum"><span class="num">07</span>It's a spectrum, not a switch</h2>
+
+<p>The biggest misconception about CAP is that it's a permanent, binary choice. In reality, modern systems are far more nuanced:</p>
+
+<p><strong>Tunable consistency.</strong> Cassandra lets you set the consistency level per query. <code>ONE</code> means any single replica can answer (very AP). <code>QUORUM</code> means a majority must agree (more CP). <code>ALL</code> means every replica must respond (fully CP). You don't pick once — you pick per operation based on what that operation needs.</p>
+
+<p><strong>Different guarantees for different data.</strong> A single application can use CP for payments and AP for user profile updates. The banking part of your app doesn't have to make the same trade-off as the notification feed.</p>
+
+<p><strong>Partitions are rare and temporary.</strong> CAP only kicks in during a partition. The rest of the time — which is the vast majority of the time — a well-designed system can be both consistent and available. The theorem constrains what happens during failures, not during normal operation.</p>
+
+<div class="callout">
+  <div class="callout-label">Beyond CAP — the PACELC model</div>
+  Daniel Abadi extended CAP with the PACELC model: if there's a <strong>P</strong>artition, choose <strong>A</strong> or <strong>C</strong>; <strong>E</strong>lse (normal operation), choose <strong>L</strong>atency or <strong>C</strong>onsistency. This captures the reality that even without partitions, there's a trade-off between how fast you respond and how consistent your data is. A system might be PA/EL (available during partitions, low latency normally — like Cassandra) or PC/EC (consistent always, even at the cost of latency — like ZooKeeper).
+</div>
+
+<div class="figure">
+  <div class="figure-label">Figure 03 — Where real systems land</div>
+  <svg viewBox="0 0 640 300" xmlns="http://www.w3.org/2000/svg">
+    <!-- Spectrum bar -->
+    <rect x="80" y="80" width="480" height="8" rx="4" fill="var(--rule)"/>
+
+    <!-- Gradient overlay -->
+    <defs>
+      <linearGradient id="spectrum-grad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="var(--s1)"/>
+        <stop offset="100%" stop-color="var(--s2)"/>
+      </linearGradient>
+    </defs>
+    <rect x="80" y="80" width="480" height="8" rx="4" fill="url(#spectrum-grad)" opacity="0.5"/>
+
+    <!-- Labels -->
+    <text x="80" y="65" class="svg-text-bold" fill="var(--s1)">CP</text>
+    <text x="80" y="112" class="svg-text-muted">Consistency first</text>
+    <text x="560" y="65" text-anchor="end" class="svg-text-bold" fill="var(--s2)">AP</text>
+    <text x="560" y="112" text-anchor="end" class="svg-text-muted">Availability first</text>
+
+    <!-- System markers -->
+    <!-- ZooKeeper - very CP -->
+    <circle cx="120" cy="84" r="6" fill="var(--s1)" stroke="var(--paper)" stroke-width="2"/>
+    <text x="120" y="145" text-anchor="middle" class="svg-text-bold">ZooKeeper</text>
+    <text x="120" y="160" text-anchor="middle" class="svg-text-muted">Raft/ZAB</text>
+
+    <!-- etcd -->
+    <circle cx="180" cy="84" r="6" fill="var(--s1)" stroke="var(--paper)" stroke-width="2"/>
+    <text x="180" y="145" text-anchor="middle" class="svg-text-bold">etcd</text>
+    <text x="180" y="160" text-anchor="middle" class="svg-text-muted">Raft</text>
+
+    <!-- MongoDB -->
+    <circle cx="270" cy="84" r="6" fill="var(--s4)" stroke="var(--paper)" stroke-width="2"/>
+    <text x="270" y="145" text-anchor="middle" class="svg-text-bold">MongoDB</text>
+    <text x="270" y="160" text-anchor="middle" class="svg-text-muted">Default CP</text>
+
+    <!-- Cassandra QUORUM -->
+    <circle cx="370" cy="84" r="6" fill="var(--s3)" stroke="var(--paper)" stroke-width="2"/>
+    <text x="370" y="145" text-anchor="middle" class="svg-text-bold">Cassandra</text>
+    <text x="370" y="160" text-anchor="middle" class="svg-text-muted">Tunable</text>
+
+    <!-- DynamoDB -->
+    <circle cx="460" cy="84" r="6" fill="var(--s2)" stroke="var(--paper)" stroke-width="2"/>
+    <text x="460" y="145" text-anchor="middle" class="svg-text-bold">DynamoDB</text>
+    <text x="460" y="160" text-anchor="middle" class="svg-text-muted">Default AP</text>
+
+    <!-- DNS -->
+    <circle cx="530" cy="84" r="6" fill="var(--s2)" stroke="var(--paper)" stroke-width="2"/>
+    <text x="530" y="145" text-anchor="middle" class="svg-text-bold">DNS</text>
+    <text x="530" y="160" text-anchor="middle" class="svg-text-muted">Heavily cached</text>
+
+    <!-- Cassandra range arrow -->
+    <line x1="320" y1="84" x2="420" y2="84" stroke="var(--s3)" stroke-width="3" opacity="0.3"/>
+
+    <!-- Bottom note -->
+    <text x="320" y="210" text-anchor="middle" class="svg-text-muted">Most modern databases let you tune where you sit on this spectrum.</text>
+    <text x="320" y="228" text-anchor="middle" class="svg-text-muted">The choice isn't binary — it's a dial you turn per operation.</text>
+  </svg>
+  <p class="figure-caption">Real systems aren't purely CP or AP. Most sit somewhere on the spectrum, and many (like Cassandra and DynamoDB) let you tune the trade-off per query. The "pick two" framing is a starting point, not the whole story.</p>
+</div>
+
+<h2 id="takeaway"><span class="num">08</span>The one-line takeaway</h2>
+
+<p class="pullquote">When the network splits, a distributed system must choose: refuse to answer (consistency) or answer with possibly stale data (availability). You can't have both at the same time.</p>
+
+<p>That's CAP in one sentence. Everything else — tunable consistency, PACELC, eventual consistency, conflict resolution — is about navigating that fundamental constraint as gracefully as possible. The best systems don't blindly pick a side. They understand the trade-off and make different choices for different operations, giving you consistency where it matters and availability where it doesn't.</p>
+
+<p>The next time someone says "we need a distributed database," the first question shouldn't be "which one?" It should be: <strong>"when the network fails, what's worse — a wrong answer or no answer?"</strong> That question, and how you answer it, shapes everything that follows.</p>
+
+<div class="divider"><span></span><span></span><span></span></div>
+
+<p>CAP is one of those theorems that sounds academic but reaches into every practical decision. It's why DynamoDB defaults to eventual consistency. It's why ZooKeeper sometimes refuses your request. It's why Cassandra lets you pick a consistency level per query. Once you see it, you see it everywhere — the invisible hand forcing trade-offs across every distributed system ever built.</p>
+
+<footer>
+  A primer on the CAP theorem<br>
+  Designed for first-time readers · Based on Brewer's conjecture (2000), the Gilbert-Lynch proof (2002), and Abadi's PACELC extension (2012)
+</footer>
+
+</div>
+</body>
+</html>
