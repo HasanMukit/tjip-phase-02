@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Class 02 Case Studies — TJIP Phase 02</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a href="index.html" class="site-logo">
+      <span class="logo-dot"></span>TJIP · Phase 02
+    </a>
+    <div class="site-nav-links">
+      <a href="index.html">Classes</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+<header>
+  <div class="eyebrow">Class 02 · Case studies</div>
+  <h1>Distributed Systems <em>in the Wild</em></h1>
+  <p class="deck">Seven short scenarios that exercise consistent hashing and the CAP theorem. Read the problem, understand the terms, think about what you'd do — then reveal the solution.</p>
+  <div class="meta">
+    <span>12 minute read</span>
+    <span>Problem &amp; solution</span>
+    <span>Assumes you've read both topics</span>
+  </div>
+</header>
+
+<div class="toc">
+  <div class="toc-title">Case studies</div>
+  <ol>
+    <li><a href="#cs1">Cache fleet resize — the <code>mod N</code> catastrophe</a></li>
+    <li><a href="#cs2">The celebrity hot shard</a></li>
+    <li><a href="#cs3">A fintech ledger during a regional split</a></li>
+    <li><a href="#cs4">A shopping cart that must never fail</a></li>
+    <li><a href="#cs5">Picking R and W for a tunable store</a></li>
+    <li><a href="#cs6">Rolling upgrade of a live database cluster</a></li>
+    <li><a href="#cs7">Losing an entire availability zone</a></li>
+  </ol>
+</div>
+
+<p class="lede">Reading a theorem is one thing. Watching it decide, at 3 a.m., whether a million users get an error or a stale balance is another. Each case study below gives you the scenario, the diagnosis, and the vocabulary you'll need — and only reveals the fix when you click for it. Try forming your own answer first; the solution makes more sense when you've taken a swing at it.</p>
+
+<div class="callout">
+  <div class="callout-label">How to read this page</div>
+  Every case study has three blocks you'll see immediately: <strong>Scenario</strong> (the setup), <strong>What's happening</strong> (the diagnosis in plain language), and <strong>Terms to know</strong> (definitions for any jargon in the scenario). The <strong>solution</strong> is hidden behind a "Reveal" toggle at the bottom of each — open it only after you've formed your own answer.
+</div>
+
+<h2 id="cs1"><span class="num">01</span>Cache fleet resize — the <code>mod N</code> catastrophe</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  You run a 10-node Memcached fleet for HTTP session storage, routed with <code>hash(session_id) mod 10</code>. Traffic is doubling. You add 5 nodes, roll out the new config, and ~15 minutes later the origin database falls over. Why?
+</div>
+
+<p><strong>What's happening.</strong> The fleet went from <code>N = 10</code> to <code>N = 15</code>. Under a <em>modulo-N</em> routing rule, the destination for almost every key depends on the current value of <code>N</code>. Change <code>N</code> and the destination changes for most keys — roughly <code>1 − 10/15 ≈ 67%</code> of them. All those keys now look up a cache entry on the wrong node, find nothing, and fall through to the origin database at the same moment. The database wasn't designed for a 67% burst of uncached requests, so its connection pool saturates and everything upstream stalls. This is not a real traffic spike; the routing scheme created its own spike.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>Memcached</dt>
+    <dd>A distributed in-memory key-value cache. Each server holds a slice of the keys; a client-side routing rule decides which server owns which key.</dd>
+
+    <dt><code>hash(key) mod N</code></dt>
+    <dd>The simplest way to map a key to one of N servers: hash the key to a big integer, take the remainder when divided by N. Fast, but the mapping breaks the instant N changes.</dd>
+
+    <dt>Cache miss</dt>
+    <dd>A lookup for a key the cache doesn't have. The system then has to fetch the real value from the slower source of truth (here, the database).</dd>
+
+    <dt>Origin / source of truth</dt>
+    <dd>The authoritative, usually slower, store behind a cache. A cache exists to shield this store from load.</dd>
+
+    <dt>Thundering herd</dt>
+    <dd>A situation where many requests suddenly hit a shared downstream resource at once — usually because a cache was flushed, a service restarted, or a lot of keys expired simultaneously.</dd>
+
+    <dt>Connection pool</dt>
+    <dd>A fixed-size set of open database connections an application reuses. When all connections are busy, new queries queue or time out, making the database appear "down."</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">Click to show the fix and the design principle behind it.</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> Swap <code>mod N</code> for <strong>consistent hashing</strong>. Here's the mental picture: imagine a giant clock face numbered 0 to a huge integer. Hash each server's name to a position on the clock. Hash each key to a position too. The rule: starting at the key's position, walk <em>clockwise</em> until you hit a server — that server owns the key.</p>
+
+    <p>Why this is kinder to the cache when you resize: a new server only "steals" the keys in the small arc between itself and its counter-clockwise neighbor. Every other server keeps its keys exactly where they were. Going from 10 to 15 servers moves roughly <code>5 / 15 ≈ 33%</code> of keys — not 67%. Cache miss storm avoided.</p>
+
+    <p>One tweak makes it robust: a single position per server can get unlucky (one new server lands in a dense patch of keys, another in a sparse one). Let each physical server plant <strong>150 virtual positions</strong> around the ring so territories spread out and load averages. Memcached's <code>ketama</code> library, Cassandra, and Riak all do this by default — flip the flag.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h4>Immediate fix</h4>
+        <p>Change your cache client from <code>mod N</code> to consistent-hashing mode (usually one config flag, e.g. <code>hash: ketama</code>). Next resize will touch ~1/N of keys instead of the majority.</p>
+      </div>
+      <div class="card">
+        <h4>Defence in depth</h4>
+        <p>Add <strong>request coalescing</strong> between cache and database. If 500 requests miss for the same key simultaneously, only the first one queries the DB — the other 499 wait for its result. Even a bad resize can't stampede the origin.</p>
+      </div>
+    </div>
+  </div>
+</details>
+
+<h2 id="cs2"><span class="num">02</span>The celebrity hot shard</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  Your social app partitions user timelines by <code>hash(user_id)</code> across a Cassandra-like ring. One user gains 40M followers overnight. Reads of <em>that user's</em> partition now hit a single physical server at 90% CPU while the rest of the fleet idles at 10%.
+</div>
+
+<p><strong>What's happening.</strong> Consistent hashing spreads <em>keys</em> evenly across servers, not <em>load</em>. The hash of one <code>user_id</code> always maps to the same ring position and therefore the same server. When that single key receives 1000× more traffic than average, the host server carries 1000× more load than its peers — no matter how many vnodes you use or how many new servers you add. The routing is working exactly as designed; it's the workload that's skewed.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>Partition</dt>
+    <dd>In a sharded database, a partition is the unit of data assigned to one node. All rows whose partition key hashes to the same position live together.</dd>
+
+    <dt>Hot key / hot shard</dt>
+    <dd>A single key or partition receiving disproportionate traffic. The rest of the cluster can be healthy while the host of the hot key melts.</dd>
+
+    <dt>Skew</dt>
+    <dd>Uneven distribution of work. In key-value stores skew can mean uneven <em>data</em> (lots of rows on one node) or uneven <em>load</em> (lots of requests to one node). They're related but not the same.</dd>
+
+    <dt>Virtual node (vnode)</dt>
+    <dd>A marker a physical server plants at many positions on the hash ring (typically 150–256). They spread a server's territory out so load balances across the ring — but they can't split <em>one</em> key.</dd>
+
+    <dt>Fan-out read</dt>
+    <dd>A read pattern where the client asks several partitions and merges the results. Solves the "one key lives in one place" limit at the cost of more coordinator work.</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">Two patterns depending on whether the workload is write-heavy or read-heavy.</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> One key is one ring position, and one ring position is one server — so as long as the celebrity lives under a single key, no amount of re-sharding helps. The fix is to stop treating it as a single key. Split the celebrity's data across many keys, put them on many servers, and merge on read. Which pattern you pick depends on whether you're drowning in writes or drowning in reads.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h4>Key salting (write-heavy)</h4>
+        <p>Instead of writing under <code>celebrity_id</code>, pick a random number 0–31 (the "salt") and write under <code>celebrity_id#7</code>, <code>celebrity_id#23</code>, etc. Each salt hashes to a different ring position, so writes now spread across up to 32 servers instead of one. On read, the client queries all 32 partitions in parallel and stitches the results together — more work per read, but the celebrity is no longer a single hot spot.</p>
+      </div>
+      <div class="card">
+        <h4>Read-path caching (read-heavy)</h4>
+        <p>For a 40M-follower celebrity, reads probably outnumber writes 1,000×. Put a small in-memory cache (Redis, or in-process) in front of that one partition. The first read fills the cache; the next 999 answer from RAM and never touch the shard. Pair it with request coalescing so a cache miss doesn't trigger a mini-stampede.</p>
+      </div>
+    </div>
+
+    <p>The deeper lesson: consistent hashing solves "where does this key live?" but <strong>skew is a workload problem, not a routing problem</strong>. If one key gets most of the traffic, you need to change the key shape or put something in front of it — the hash ring alone cannot help.</p>
+  </div>
+</details>
+
+<h2 id="cs3"><span class="num">03</span>A fintech ledger during a regional split</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  You run a payments ledger across two regions with synchronous replication. At 14:02 the inter-region link degrades: packets still flow but 40% are lost and latency spikes to 8 seconds. Do you let each region keep accepting writes, or pause half the world?
+</div>
+
+<p><strong>What's happening.</strong> Your two regions can no longer reliably coordinate. If both keep accepting writes, user <em>alice</em> could withdraw her full $500 balance in <em>eu-west</em> while another session withdraws the same $500 in <em>us-east</em>. When the link heals, the ledger has a $500 deficit — a real-money bug and a regulatory problem. This is the textbook CAP dilemma: during a network partition a distributed system must pick between <strong>C</strong>onsistency (no wrong answers) and <strong>A</strong>vailability (every region answers). You cannot have both while the regions are disconnected.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>Synchronous replication</dt>
+    <dd>A write isn't acknowledged to the client until it has been persisted on more than one replica. Gives strong durability; slows writes by a network round-trip.</dd>
+
+    <dt>Network partition</dt>
+    <dd>A failure where nodes can't reliably talk to each other even though they're all individually alive. The cluster splits into groups that can't agree on state.</dd>
+
+    <dt>CAP theorem</dt>
+    <dd>Conjectured by Eric Brewer (2000), proved by Gilbert and Lynch (2002). During a partition, a distributed system must sacrifice either Consistency or Availability. P (partition tolerance) is mandatory on any real network.</dd>
+
+    <dt>Linearizability</dt>
+    <dd>The strongest form of consistency: every read returns the most recent committed write, as if there were a single copy of the data. What money demands.</dd>
+
+    <dt>Consensus protocol</dt>
+    <dd>An algorithm (Raft, Paxos, Zab) that lets a set of replicas agree on a linear sequence of commands despite failures. Commits require a <em>majority</em> of replicas to agree.</dd>
+
+    <dt>CP system</dt>
+    <dd>A system that, under partition, preserves Consistency at the cost of Availability — the minority side returns errors instead of risking wrong answers.</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">Why money demands CP, and how many regions you actually need.</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> Choose <strong>CP</strong> — consistency, even if it means some users see an error. Run the ledger on a consensus-backed store (Raft-based like <a href="cap-theorem.html">etcd</a> or CockroachDB, Paxos-based like Spanner). These databases enforce one rule: a write is not committed until a <em>majority</em> of replicas agree. "Majority" is strictly more than half — for 3 replicas that's 2; for 5 replicas that's 3. Because only one group of replicas can hold a majority at any given time, only one side of a partition can accept writes. The other side returns HTTP 503.</p>
+
+    <p>Replay the scenario: when the inter-region link degrades, at most one region still has a majority of replicas reachable. That region keeps processing Alice's withdrawals. The region without a majority refuses them — Alice sees "payments temporarily unavailable" there, but she <em>cannot</em> drain $500 twice. When the link heals, there's no divergence to reconcile; the ledger was only ever changing on one side.</p>
+
+    <p class="pullquote">For money, a wrong answer is worse than no answer.</p>
+
+    <p>This is why region count matters. Two equal regions + partition = neither has a majority (both sides see 1 of 2), so <em>both</em> stop accepting writes. Real-world systems run <strong>three</strong> regions (or two regions plus a small tiebreaker node in a third location) so the surviving majority is always well-defined.</p>
+  </div>
+</details>
+
+<h2 id="cs4"><span class="num">04</span>A shopping cart that must never fail</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  Same network failure as above, but now for the shopping-cart service of a big-box retailer. Black Friday is in 4 hours. Product leadership: "Under no circumstances do we show an error when a customer tries to add to cart."
+</div>
+
+<p><strong>What's happening.</strong> Here the trade-off inverts. A cart that rejects "Add to cart" during a partition directly burns revenue and trust — a rejection you <em>saw</em> is worse than a stale answer you didn't notice. But if both regions accept writes independently, the replicas will disagree when the partition heals. A naive "last write wins" resolver can <em>delete</em> items the user added if the clocks don't line up perfectly. Divergence is cheap; data loss is not.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>AP system</dt>
+    <dd>Under partition, chooses Availability over Consistency: every healthy node answers, possibly with stale or divergent data, and conflicts are reconciled later.</dd>
+
+    <dt>Eventual consistency</dt>
+    <dd>A consistency model where replicas are allowed to diverge temporarily but are guaranteed to converge once updates stop flowing. No freshness guarantee at read time.</dd>
+
+    <dt>Last-write-wins (LWW)</dt>
+    <dd>A conflict-resolution rule that picks the update with the latest timestamp when replicas disagree. Simple, but loses concurrent updates and is clock-skew sensitive.</dd>
+
+    <dt>Vector clock</dt>
+    <dd>A data structure that records "who saw what, when" across replicas. Lets you detect when two versions were updated concurrently (neither happened-before the other) rather than silently picking one.</dd>
+
+    <dt>CRDT (Conflict-free Replicated Data Type)</dt>
+    <dd>A data type designed so concurrent updates always merge deterministically without loss. Examples: counters, sets, maps with well-defined union semantics.</dd>
+
+    <dt>OR-Set (Observed-Remove Set)</dt>
+    <dd>A specific CRDT for sets where adds always win over concurrent removes that haven't "seen" them. Used to model carts, todo lists, and other collections.</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">AP done carefully — the conflict resolution is the whole game.</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> Choose <strong>AP</strong> — keep every region answering — but replace last-write-wins with a data model whose merge rules <em>cannot</em> lose information. The goal is to make the cart behave like a math operation: no matter which updates each side saw in which order, when the replicas finally compare notes they combine their states deterministically and never drop an add.</p>
+
+    <p>Walk through with an <strong>OR-Set</strong> (observed-remove set). Alice's cart starts as <code>{shoes}</code>. The partition begins. In eu-west she adds <code>hat</code>; in us-east she removes <code>shoes</code>. Each operation is tagged with a unique ID so later we can tell what "saw" what. On heal, the merge rule is: keep every add whose ID was <em>not</em> explicitly observed by any remove. Result: <code>{hat}</code>. The <code>hat</code> add happened on the other side and no remove ever saw it, so it survives. The <code>shoes</code> remove did see the original <code>shoes</code> add (that's why it could target it), so shoes is gone. No lost hats, no timestamp games, no clock-skew bugs.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h4>Union-merge (CRDT)</h4>
+        <p>Model the cart as an OR-Set, as above. The database library does the merge for you. Amazon's original Dynamo paper recommended this exact pattern for carts — it's the canonical AP example.</p>
+      </div>
+      <div class="card">
+        <h4>Per-replica vector clocks</h4>
+        <p>Attach a vector clock (a "who saw what" counter) to each cart version. On heal, if two versions are genuinely concurrent, the database returns both as "siblings" and the app (or user) picks. Cassandra and Riak both support this.</p>
+      </div>
+    </div>
+
+    <p>The key insight: "AP" doesn't mean "accept lies." It means "accept divergence, then reconcile with rules that preserve user intent." Last-write-wins breaks that promise; CRDTs and vector clocks keep it.</p>
+  </div>
+</details>
+
+<h2 id="cs5"><span class="num">05</span>Picking R and W for a tunable store</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  You're deploying a Cassandra-style cluster with replication factor <code>N = 3</code>. The client lets you pick <code>R</code> (read quorum) and <code>W</code> (write quorum) <em>per query</em>. Three teams want different things: the analytics team wants cheap reads, the user-profile team wants "normal" reads, the billing team wants safety. What do you give them?
+</div>
+
+<p><strong>What's happening.</strong> Consistency in a replicated store isn't a single cluster-wide knob — it's a pair you choose per query. You decide how many replicas a write must reach (<code>W</code>) before it's acknowledged, and how many a read must consult (<code>R</code>) before it can return. The interaction between these two, and the replication factor <code>N</code>, determines whether reads can possibly return stale data.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>Replication factor (<code>N</code>)</dt>
+    <dd>How many replicas of each piece of data the cluster stores. Higher N means more redundancy and read options, but more write cost and storage.</dd>
+
+    <dt>Write quorum (<code>W</code>)</dt>
+    <dd>The number of replicas that must acknowledge a write before the client gets a success. Lower W is faster; higher W is safer.</dd>
+
+    <dt>Read quorum (<code>R</code>)</dt>
+    <dd>The number of replicas the coordinator consults on a read, reconciling the responses (usually by picking the version with the latest timestamp).</dd>
+
+    <dt>Linearizable read</dt>
+    <dd>A read guaranteed to see the latest committed write. Achieved when <code>R + W &gt; N</code>: the read and write sets of replicas must overlap, so at least one replica in every read has seen every write.</dd>
+
+    <dt>Quorum / QUORUM</dt>
+    <dd>A majority: <code>⌊N/2⌋ + 1</code>. With N=3 that's 2. A quorum read + quorum write satisfies the linearizability inequality.</dd>
+
+    <dt>PACELC</dt>
+    <dd>A refinement of CAP. <em>P</em>artition → choose <em>A</em>vailability or <em>C</em>onsistency. <em>E</em>lse (normal operation) → choose <em>L</em>atency or <em>C</em>onsistency. Captures that there's also a trade-off when the network is healthy.</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">One cluster, three different (R, W) profiles per workload.</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> Give each team their own <code>(R, W)</code> profile on the same cluster — nobody needs a separate database. The rule that makes this work is one inequality:</p>
+
+    <p style="font-family: 'JetBrains Mono', monospace; font-size: 15px; color: var(--accent); text-align: center; margin: 24px 0;">R + W &gt; N  ⇒  linearizable reads</p>
+
+    <p>Why the inequality holds, step by step. Suppose <code>N = 3</code>. A write with <code>W = 2</code> has to reach at least 2 of the 3 replicas before it's acknowledged. A subsequent read with <code>R = 2</code> has to consult at least 2 replicas before returning. Since <code>2 + 2 = 4</code> is greater than <code>N = 3</code>, the write's two replicas and the read's two replicas <em>must</em> overlap in at least one node — by pigeonhole, there's no way to pick two disjoint pairs out of three. That overlapping replica has the latest write, the coordinator picks the latest-timestamped version it sees, and the read returns fresh data. If <code>R + W ≤ N</code>, the two sets might not overlap, and the read can return a stale value from a replica that missed the write.</p>
+
+    <div style="margin: 24px 0 32px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper-warm); overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 13.5px;">
+        <thead>
+          <tr style="background: var(--paper); border-bottom: 1px solid var(--rule);">
+            <th style="text-align: left; padding: 14px 18px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);">Team</th>
+            <th style="text-align: left; padding: 14px 14px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);">R, W</th>
+            <th style="text-align: left; padding: 14px 14px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);">Behaviour</th>
+            <th style="text-align: left; padding: 14px 18px 14px 14px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--s2);">Lands at</th>
+          </tr>
+        </thead>
+        <tbody style="color: var(--muted); line-height: 1.5;">
+          <tr style="border-bottom: 1px solid var(--rule);">
+            <td style="padding: 12px 18px; color: var(--ink);">Analytics</td>
+            <td style="padding: 12px 14px; font-family: 'JetBrains Mono', monospace;">R=1, W=1</td>
+            <td style="padding: 12px 14px;">Fast, may be stale; survives 2 replica failures</td>
+            <td style="padding: 12px 18px 12px 14px; color: var(--s2);">AP</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--rule);">
+            <td style="padding: 12px 18px; color: var(--ink);">User profile</td>
+            <td style="padding: 12px 14px; font-family: 'JetBrains Mono', monospace;">R=2, W=2 (QUORUM)</td>
+            <td style="padding: 12px 14px;">R+W=4 &gt; 3: linearizable; tolerates 1 replica loss</td>
+            <td style="padding: 12px 18px 12px 14px;">balanced</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 18px; color: var(--ink);">Billing</td>
+            <td style="padding: 12px 14px; font-family: 'JetBrains Mono', monospace;">R=3, W=3 (ALL)</td>
+            <td style="padding: 12px 14px;">Fully consistent; any replica outage blocks writes</td>
+            <td style="padding: 12px 18px 12px 14px; color: var(--s1);">CP</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>One cluster, three consistency profiles. This is PACELC in practice: during a partition you're forced to pick availability vs consistency, but <em>even during normal operation</em> you're picking latency (R=1) vs consistency (R=3). Tune per query, not per cluster.</p>
+  </div>
+</details>
+
+<h2 id="cs6"><span class="num">06</span>Rolling upgrade of a live database cluster</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  A 50-node Cassandra cluster runs on an OS that reached end-of-life. You need to upgrade every node. Total downtime allowed: zero. How do consistent hashing and replication let you do this without anyone noticing?
+</div>
+
+<p><strong>What's happening.</strong> To upgrade a node you have to take it down. Taking a node down deletes its vnodes from the ring. Any key whose primary replica was on that node is suddenly one replica short — the surviving replicas serve reads, but the redundancy is reduced. If you tried to do this to 10 nodes at once, some keys might lose all 3 replicas simultaneously and that's real data loss. A careful rolling upgrade has to keep the invariant "at most one replica missing per key" true for every moment of the rollout.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>Drain / cordon</dt>
+    <dd>Drain: gracefully finish in-flight requests and stop accepting new ones. Cordon: mark the node so the cluster's routing avoids it without thinking it's failed.</dd>
+
+    <dt>Gossip protocol</dt>
+    <dd>A peer-to-peer heartbeat mechanism where each node periodically exchanges cluster state with a few random peers. Membership changes propagate to everyone within seconds.</dd>
+
+    <dt>Hinted handoff</dt>
+    <dd>When a target replica is temporarily down, a healthy replica stores the pending write as a "hint" and delivers it when the target recovers. Cassandra's first line of defence against short outages.</dd>
+
+    <dt>Anti-entropy repair</dt>
+    <dd>A background process that compares replicas of the same data (usually using Merkle trees) and fixes any divergence. Catches writes that slipped through hinted handoff.</dd>
+
+    <dt>Rack awareness</dt>
+    <dd>A replica-placement rule that forces the N replicas of each key onto N different failure domains (racks, AZs). Means a whole-rack outage costs only one replica per key.</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">Three design properties conspire to make one-at-a-time rollouts invisible.</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> The trick isn't any single feature — it's that three independent design choices already in the cluster conspire to make single-node downtime invisible. Walk through one node's upgrade and watch them compose:</p>
+
+    <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+      <li><strong>Vnodes scatter the pain.</strong> You drain node A. Its 150 virtual positions disappear from the ring, and the keys they owned shift to 150 <em>different</em> neighbors — not one unlucky neighbor absorbing everything. No one peer gets a 2× load spike.</li>
+      <li><strong>RF ≥ 3 and rack-awareness survive the gap.</strong> Every key on node A still has 2 other replicas, placed on different racks (or AZs) by design. Reads with <code>R = QUORUM</code> (i.e. 2 out of 3) keep returning correct answers the whole time. Writes with <code>W = QUORUM</code> keep committing.</li>
+      <li><strong>Gossip + hinted handoff catch up the latecomer.</strong> While A is down, peers that receive writes for A's keys stash them locally as "hints." When the upgraded A rejoins (gossip notices within seconds), peers replay those hints to A. A background anti-entropy repair then sweeps for anything the hints missed.</li>
+    </ol>
+
+    <p>The operational recipe, node by node: drain → cordon → upgrade the OS → restart Cassandra → wait for gossip to mark it UP → wait for repair to finish → move to the next node. At every single moment of the rollout, each key has at least 2 of 3 replicas live, so quorum reads and writes never fail. Do all 50 nodes sequentially and users see zero downtime.</p>
+
+    <div class="callout">
+      <div class="callout-label">The beautiful part</div>
+      None of the routing logic changes during the upgrade. Clients still hash keys and walk the ring clockwise. A vnode just has a temporarily different physical home — which is the same situation the cluster handles every time a node crashes unexpectedly. Rolling upgrades reuse the failure-recovery code path on purpose.
+    </div>
+  </div>
+</details>
+
+<h2 id="cs7"><span class="num">07</span>Losing an entire availability zone</h2>
+
+<div class="callout">
+  <div class="callout-label">Scenario</div>
+  Your RF=3 cluster is split across three AZs (a, b, c) with 20 nodes per zone. At 02:14, AZ-a's networking hardware fails and stays down for 3 hours. Which keys are safe, which are not, and what does the cluster do?
+</div>
+
+<p><strong>What's happening.</strong> Losing an AZ kills ~33% of the nodes at once. Whether this is survivable depends entirely on where the replicas were placed. If the replica-placement strategy is oblivious to AZs, it may randomly land 2 of 3 replicas for some keys in the same AZ. Those keys just lost 2 of 3 replicas — quorum reads (R=2) now fail for them. If the placement strategy is AZ-aware, each key has exactly one replica per AZ, and losing one AZ costs exactly one replica per key — everything still meets quorum.</p>
+
+<div class="terms">
+  <div class="terms-label">Terms to know</div>
+  <dl>
+    <dt>Availability Zone (AZ)</dt>
+    <dd>A failure-isolated datacenter within a cloud region. Usually on independent power, cooling, and networking. A typical region has 2–6 AZs; they're the granularity at which cloud providers guarantee independent failure.</dd>
+
+    <dt>NetworkTopologyStrategy</dt>
+    <dd>Cassandra's rack-aware replica placement strategy. When walking the ring to pick replicas, it skips candidates in racks (AZs) where it already placed a replica.</dd>
+
+    <dt>Replication factor (RF)</dt>
+    <dd>Same as <code>N</code> in the quorum inequalities — how many copies of each piece of data the cluster stores.</dd>
+
+    <dt>Under-replicated</dt>
+    <dd>State where a key has fewer live replicas than the replication factor demands. Still readable while any replica survives, but durability is reduced until repair restores the missing copies.</dd>
+  </dl>
+</div>
+
+<details class="solution-reveal">
+  <summary>
+    <span>Reveal the solution
+      <span class="solution-hint">Rack-awareness turns "disaster" into "graceful degradation".</span>
+    </span>
+  </summary>
+  <div class="solution-body">
+    <p><strong>Solution.</strong> Turn on a <strong>rack-aware placement strategy</strong> (in Cassandra: <code>NetworkTopologyStrategy</code>). The ring-walk for picking replicas now has an extra rule: when looking for the 2nd and 3rd replicas, <em>skip any candidate that lives in an AZ already used</em>. The result: every key's 3 replicas land in 3 different AZs, one per zone, guaranteed.</p>
+
+    <p>Concretely, picture key <code>k</code>. With the default (AZ-oblivious) strategy, its 3 replicas might land on nodes 4, 5, 6 — which happen to all be in AZ-a. When AZ-a fails, key <code>k</code> has 0 live replicas: total outage for that key. With rack-awareness, the walk picks node 4 in AZ-a, skips node 5 (also AZ-a) and node 6 (also AZ-a), and lands on node 21 in AZ-b; skips candidates in AZ-a and AZ-b until it finds node 42 in AZ-c. Now key <code>k</code>'s three replicas are one per zone. AZ-a failing costs exactly one replica per key — never two or three.</p>
+
+    <div class="two-col">
+      <div class="card">
+        <h4>While AZ-a is down (hours 0–3)</h4>
+        <p>Every key has 2 of 3 replicas live. Reads and writes at <code>QUORUM</code> (=2) keep succeeding. Only reads at <code>R = ALL</code> fail — so a small slice of strict-consistency traffic errors, and everything else serves normally.</p>
+      </div>
+      <div class="card">
+        <h4>When AZ-a returns</h4>
+        <p>Gossip marks the AZ-a nodes UP. Anti-entropy repair compares replicas (using Merkle-tree diffs) and backfills the 3 hours of missed writes. Network and disk utilization spike during repair, but user-facing traffic is unaffected. Full RF=3 is restored in minutes to hours.</p>
+      </div>
+    </div>
+
+    <p class="pullquote">Consistent hashing tells you <em>where</em> data lives. Rack-awareness tells you where it <em>doesn't</em> — and the second rule is what makes you disaster-proof.</p>
+  </div>
+</details>
+
+<h2 id="wrap"><span class="num">08</span>The pattern across all seven</h2>
+
+<p>These scenarios look different but the reasoning has the same shape:</p>
+
+<ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+  <li><strong>Name the failure mode first.</strong> Thundering herd, skew, divergence, data loss. The fix falls out of knowing which one you're fighting.</li>
+  <li><strong>Ask the CAP question explicitly.</strong> "When the network breaks, is a wrong answer worse than no answer?" The answer is different for a ledger (CP) and a cart (AP) — and may even differ per endpoint within one app.</li>
+  <li><strong>Use the routing layer for routing, the storage layer for safety.</strong> Consistent hashing solves placement; replication and quorum solve durability and consistency. Don't ask one to do the other's job.</li>
+</ul>
+
+<p>Every distributed system you'll ever build or operate will hand you a variation of one of these seven. The names change; the questions don't.</p>
+
+<div class="divider"><span></span><span></span><span></span></div>
+
+<p>Companion reading: <a href="consistent-hashing.html">Consistent Hashing</a> and <a href="cap-theorem.html">The CAP Theorem</a>.</p>
+
+<footer>
+  Case studies for Class 02 · Distributed systems fundamentals<br>
+  Scenarios adapted from production incidents at Amazon, Discord, Netflix, Shopify, and the Cassandra/Riak user lists
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,468 +1,543 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TJIP Phase 02 — System Design Notes</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-
-<nav class="site-nav">
-  <div class="site-nav-inner">
-    <a href="index.html" class="site-logo">
-      <span class="logo-dot"></span>TJIP · Phase 02
-    </a>
-    <div class="site-nav-links">
-      <a href="index.html" class="active">Classes</a>
-      <a href="#about">About</a>
-    </div>
-  </div>
-</nav>
-
-<section class="hero">
-  <div class="hero-eyebrow">Course Notes</div>
-  <h1>System <em>Design</em> &amp; Beyond</h1>
-  <p class="hero-deck">Visual write-ups and deep dives from a 24-class journey through system design, distributed systems, and software architecture.</p>
-  <div class="hero-stats">
-    <div>
-      <span class="stat-value">24</span>
-      Classes
-    </div>
-    <div>
-      <span class="stat-value">05</span>
-      Topics covered
-    </div>
-    <div>
-      <span class="stat-value">03</span>
-      Current class
-    </div>
-  </div>
-</section>
-
-<section class="classes-section">
-  <div class="section-title">All Classes</div>
-
-  <!-- Class 01 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">01</span>
-      <div class="class-info">
-        <div class="class-title">Class 1</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TJIP Phase 02 — System Design Notes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="index.html" class="site-logo"> <span class="logo-dot"></span>TJIP · Phase 02 </a>
+        <div class="site-nav-links">
+          <a href="index.html" class="active">Classes</a>
+          <a href="#about">About</a>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
+    </nav>
 
-  <!-- Class 02 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">02</span>
-      <div class="class-info">
-        <div class="class-title">Distributed Systems Fundamentals</div>
-        <div class="class-summary">How data is distributed across machines — consistent hashing, the CAP theorem, and the core trade-offs of distributed systems.</div>
+    <section class="hero">
+      <div class="hero-eyebrow">Course Notes</div>
+      <h1>System <em>Design</em> &amp; Beyond</h1>
+      <p class="hero-deck">
+        Visual write-ups and deep dives from a 24-class journey through system design, distributed systems, and software
+        architecture.
+      </p>
+      <div class="hero-stats">
+        <div>
+          <span class="stat-value">24</span>
+          Classes
+        </div>
+        <div>
+          <span class="stat-value">05</span>
+          Topics covered
+        </div>
+        <div>
+          <span class="stat-value">03</span>
+          Current class
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><a class="topic-link" href="consistent-hashing.html"><span class="topic-status done"></span>Consistent Hashing</a></li>
-        <li class="topic-item"><a class="topic-link" href="cap-theorem.html"><span class="topic-status done"></span>CAP Theorem</a></li>
-      </ul>
-    </div>
-  </div>
+    </section>
 
-  <!-- Class 03 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">03</span>
-      <div class="class-info">
-        <div class="class-title">Performance Fundamentals</div>
-        <div class="class-summary">The vocabulary of fast systems — latency vs. throughput, the trade-off between them, Little's Law, and why p95 and p99 matter more than averages.</div>
+    <section class="classes-section">
+      <div class="section-title">All Classes</div>
+
+      <!-- Class 01 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">01</span>
+          <div class="class-info">
+            <div class="class-title">Class 1</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><a class="topic-link" href="latency.html"><span class="topic-status done"></span>Latency</a></li>
-        <li class="topic-item"><a class="topic-link" href="throughput.html"><span class="topic-status done"></span>Throughput</a></li>
-        <li class="topic-item"><a class="topic-link" href="latency-throughput.html"><span class="topic-status done"></span>Latency &amp; Throughput</a></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 04 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">04</span>
-      <div class="class-info">
-        <div class="class-title">Class 4</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 02 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">02</span>
+          <div class="class-info">
+            <div class="class-title">Distributed Systems Fundamentals</div>
+            <div class="class-summary">
+              How data is distributed across machines — consistent hashing, the CAP theorem, and the core trade-offs of
+              distributed systems.
+            </div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <a class="topic-link" href="consistent-hashing.html"
+                ><span class="topic-status done"></span>Consistent Hashing</a
+              >
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="cap-theorem.html"><span class="topic-status done"></span>CAP Theorem</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="class-02-case-studies.html"
+                ><span class="topic-status done"></span>Case Studies</a
+              >
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 05 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">05</span>
-      <div class="class-info">
-        <div class="class-title">Class 5</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 03 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">03</span>
+          <div class="class-info">
+            <div class="class-title">Performance Fundamentals</div>
+            <div class="class-summary">
+              The vocabulary of fast systems — latency vs. throughput, the trade-off between them, Little's Law, and why
+              p95 and p99 matter more than averages.
+            </div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <a class="topic-link" href="latency.html"><span class="topic-status done"></span>Latency</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="throughput.html"><span class="topic-status done"></span>Throughput</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="latency-throughput.html"
+                ><span class="topic-status done"></span>Latency &amp; Throughput</a
+              >
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="class-03-case-studies.html"
+                ><span class="topic-status done"></span>Case Studies</a
+              >
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 06 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">06</span>
-      <div class="class-info">
-        <div class="class-title">Class 6</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 04 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">04</span>
+          <div class="class-info">
+            <div class="class-title">Class 4</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 07 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">07</span>
-      <div class="class-info">
-        <div class="class-title">Class 7</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 05 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">05</span>
+          <div class="class-info">
+            <div class="class-title">Class 5</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 08 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">08</span>
-      <div class="class-info">
-        <div class="class-title">Class 8</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 06 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">06</span>
+          <div class="class-info">
+            <div class="class-title">Class 6</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 09 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">09</span>
-      <div class="class-info">
-        <div class="class-title">Class 9</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 07 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">07</span>
+          <div class="class-info">
+            <div class="class-title">Class 7</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 10 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">10</span>
-      <div class="class-info">
-        <div class="class-title">Class 10</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 08 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">08</span>
+          <div class="class-info">
+            <div class="class-title">Class 8</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 11 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">11</span>
-      <div class="class-info">
-        <div class="class-title">Class 11</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 09 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">09</span>
+          <div class="class-info">
+            <div class="class-title">Class 9</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 12 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">12</span>
-      <div class="class-info">
-        <div class="class-title">Class 12</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 10 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">10</span>
+          <div class="class-info">
+            <div class="class-title">Class 10</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 13 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">13</span>
-      <div class="class-info">
-        <div class="class-title">Class 13</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 11 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">11</span>
+          <div class="class-info">
+            <div class="class-title">Class 11</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 14 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">14</span>
-      <div class="class-info">
-        <div class="class-title">Class 14</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 12 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">12</span>
+          <div class="class-info">
+            <div class="class-title">Class 12</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 15 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">15</span>
-      <div class="class-info">
-        <div class="class-title">Class 15</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 13 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">13</span>
+          <div class="class-info">
+            <div class="class-title">Class 13</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 16 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">16</span>
-      <div class="class-info">
-        <div class="class-title">Class 16</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 14 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">14</span>
+          <div class="class-info">
+            <div class="class-title">Class 14</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 17 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">17</span>
-      <div class="class-info">
-        <div class="class-title">Class 17</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 15 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">15</span>
+          <div class="class-info">
+            <div class="class-title">Class 15</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 18 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">18</span>
-      <div class="class-info">
-        <div class="class-title">Class 18</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 16 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">16</span>
+          <div class="class-info">
+            <div class="class-title">Class 16</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 19 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">19</span>
-      <div class="class-info">
-        <div class="class-title">Class 19</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 17 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">17</span>
+          <div class="class-info">
+            <div class="class-title">Class 17</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 20 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">20</span>
-      <div class="class-info">
-        <div class="class-title">Class 20</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 18 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">18</span>
+          <div class="class-info">
+            <div class="class-title">Class 18</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 21 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">21</span>
-      <div class="class-info">
-        <div class="class-title">Class 21</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 19 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">19</span>
+          <div class="class-info">
+            <div class="class-title">Class 19</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 22 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">22</span>
-      <div class="class-info">
-        <div class="class-title">Class 22</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 20 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">20</span>
+          <div class="class-info">
+            <div class="class-title">Class 20</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 23 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">23</span>
-      <div class="class-info">
-        <div class="class-title">Class 23</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 21 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">21</span>
+          <div class="class-info">
+            <div class="class-title">Class 21</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-  <!-- Class 24 -->
-  <div class="class-card">
-    <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
-      <span class="class-num">24</span>
-      <div class="class-info">
-        <div class="class-title">Class 24</div>
-        <div class="class-summary">Topics and write-ups coming soon.</div>
+      <!-- Class 22 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">22</span>
+          <div class="class-info">
+            <div class="class-title">Class 22</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
       </div>
-      <span class="class-toggle">+</span>
-    </div>
-    <div class="class-topics">
-      <ul class="topic-list">
-        <li class="topic-item"><span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span></li>
-      </ul>
-    </div>
-  </div>
 
-</section>
+      <!-- Class 23 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">23</span>
+          <div class="class-info">
+            <div class="class-title">Class 23</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
+      </div>
 
-<footer class="site-footer" id="about">
-  TJIP Phase 02 — System Design Notes<br>
-  Visual write-ups and topic deep dives from a 24-class course
-</footer>
+      <!-- Class 24 -->
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">24</span>
+          <div class="class-info">
+            <div class="class-title">Class 24</div>
+            <div class="class-summary">Topics and write-ups coming soon.</div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <span class="topic-link coming-soon"><span class="topic-status pending"></span>Coming Soon</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
 
-</body>
+    <footer class="site-footer" id="about">
+      TJIP Phase 02 — System Design Notes<br />
+      Visual write-ups and topic deep dives from a 24-class course
+    </footer>
+  </body>
 </html>
