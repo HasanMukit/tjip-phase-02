@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hardware Pressure — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Hardware</a></div>
+        <h1>Hardware <em>pressure</em></h1>
+        <p class="deck">
+          "How would you handle 1M req/s?" has no answer until you say which kind of request. Each kind pushes on a
+          different part of the machine.
+        </p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Hardware</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#question">The trick question</a></li>
+          <li><a href="#components">Four things a request can pressure</a></li>
+          <li><a href="#profiles">Five requests, five pressure profiles</a></li>
+          <li><a href="#shape">Reading the pressure shape</a></li>
+          <li><a href="#capacity">From shape to capacity plan</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">
+        Someone walks up to a whiteboard and asks "design something that handles 1 million requests per second." It feels
+        like a single number, a single problem. It isn't. A million tiny health checks, a million credit-card charges,
+        and a million 4K video streams all read "1M RPS" on a graph — and they need wildly different machines underneath.
+        The unit hides everything that matters.
+      </p>
+
+      <p>
+        This page is about what "1M requests" actually does to a server. The same load pushes on different hardware
+        depending on what the request is doing — and once you can see which component is being squeezed, the design
+        starts to write itself.
+      </p>
+
+      <h2 id="question"><span class="num">01</span>The trick question</h2>
+
+      <p>
+        "Can your system handle 1M req/s?" is a trick question because it conflates the rate with the work. Two services
+        with identical RPS numbers can be doing completely different jobs:
+      </p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Service A — health probes</h4>
+          <p>
+            1M req/s of <code>GET /healthz</code>. Each request is &lt; 100 bytes, returns "OK", touches no database. The
+            CPU barely shrugs; the network card is the only thing breaking a sweat.
+          </p>
+        </div>
+        <div class="card">
+          <h4>Service B — video transcode</h4>
+          <p>
+            1M req/s of "transcode this 1080p clip to 720p." Each request burns seconds of CPU on a video codec, reads
+            gigabytes from storage, writes more back. One box couldn't even start.
+          </p>
+        </div>
+      </div>
+
+      <p>
+        Same number on the dashboard. Same words at the meeting. Different planet underneath.
+        <strong
+          >There is no answer to "can you handle 1M req/s" until you describe what one request actually does</strong
+        >
+        — what it reads, what it writes, what it computes, where the bytes have to travel.
+      </p>
+
+      <div class="callout">
+        <div class="callout-label">The real question</div>
+        Replace "how many requests" with "what does one request cost, on which component." Cost in CPU cycles, cost in
+        bytes pushed, cost in disk seeks, cost in network round-trips. Multiply by RPS. Now you have a number a piece of
+        hardware can answer.
+      </div>
+
+      <h2 id="components"><span class="num">02</span>Four things a request can pressure</h2>
+
+      <p>
+        A modern server is, roughly, four resources welded together. Any request stresses some mix of them — but rarely
+        all four equally. Knowing which one is being squeezed is half of system design.
+      </p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The four pressure points</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="60" width="130" height="200" rx="6" fill="var(--s1)" opacity="0.9" />
+          <rect x="190" y="60" width="130" height="200" rx="6" fill="var(--s2)" opacity="0.9" />
+          <rect x="340" y="60" width="130" height="200" rx="6" fill="var(--s3)" opacity="0.9" />
+          <rect x="490" y="60" width="110" height="200" rx="6" fill="var(--s4)" opacity="0.9" />
+
+          <text x="105" y="100" text-anchor="middle" class="svg-text-bold" fill="white" font-size="14">CPU</text>
+          <text x="255" y="100" text-anchor="middle" class="svg-text-bold" fill="white" font-size="14">RAM</text>
+          <text x="405" y="100" text-anchor="middle" class="svg-text-bold" fill="white" font-size="14">Disk</text>
+          <text x="545" y="100" text-anchor="middle" class="svg-text-bold" fill="white" font-size="14">Network</text>
+
+          <text x="105" y="135" text-anchor="middle" class="svg-text-bold" fill="white">cycles/sec</text>
+          <text x="255" y="135" text-anchor="middle" class="svg-text-bold" fill="white">GB &amp; GB/s</text>
+          <text x="405" y="135" text-anchor="middle" class="svg-text-bold" fill="white">IOPS &amp; MB/s</text>
+          <text x="545" y="135" text-anchor="middle" class="svg-text-bold" fill="white">Gbps &amp; pps</text>
+
+          <text x="105" y="170" text-anchor="middle" class="svg-text" fill="white">parse JSON</text>
+          <text x="105" y="186" text-anchor="middle" class="svg-text" fill="white">hash, encrypt</text>
+          <text x="105" y="202" text-anchor="middle" class="svg-text" fill="white">compress</text>
+          <text x="105" y="218" text-anchor="middle" class="svg-text" fill="white">business logic</text>
+
+          <text x="255" y="170" text-anchor="middle" class="svg-text" fill="white">in-memory cache</text>
+          <text x="255" y="186" text-anchor="middle" class="svg-text" fill="white">working set</text>
+          <text x="255" y="202" text-anchor="middle" class="svg-text" fill="white">connection state</text>
+          <text x="255" y="218" text-anchor="middle" class="svg-text" fill="white">heap allocations</text>
+
+          <text x="405" y="170" text-anchor="middle" class="svg-text" fill="white">DB read/write</text>
+          <text x="405" y="186" text-anchor="middle" class="svg-text" fill="white">log append</text>
+          <text x="405" y="202" text-anchor="middle" class="svg-text" fill="white">blob fetch</text>
+          <text x="405" y="218" text-anchor="middle" class="svg-text" fill="white">page-cache miss</text>
+
+          <text x="545" y="170" text-anchor="middle" class="svg-text" fill="white">request bytes in</text>
+          <text x="545" y="186" text-anchor="middle" class="svg-text" fill="white">response out</text>
+          <text x="545" y="202" text-anchor="middle" class="svg-text" fill="white">backend RPC</text>
+          <text x="545" y="218" text-anchor="middle" class="svg-text" fill="white">TLS handshakes</text>
+
+          <text x="320" y="40" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">
+            Every request stresses some mix of these — rarely all four
+          </text>
+          <text x="320" y="290" text-anchor="middle" class="svg-text-muted">
+            whichever fills up first becomes the bottleneck
+          </text>
+        </svg>
+        <p class="figure-caption">
+          CPU spends cycles on parsing, math, crypto, business logic. RAM holds the
+          <a class="glink" href="../glossary.html#working-set">working set</a>, the cache, and the in-flight state of
+          every connection. Disk persists data and is the slowest tier most requests touch. Network carries every byte
+          the request reads or writes — and at high RPS,
+          <a class="glink" href="../glossary.html#pps">packets-per-second</a> can saturate the
+          <a class="glink" href="../glossary.html#nic">NIC</a> before bandwidth does.
+        </p>
+      </div>
+
+      <h3>CPU — cycles per second</h3>
+
+      <p>
+        The CPU is the cycle-burner. Every parsed header, every JSON deserialization, every <code>SHA-256</code>, every
+        gzip, every floating-point multiply costs cycles. A modern core does ~3 × 10⁹ cycles/sec; a 32-core box does
+        ~10¹¹. Once those cycles are spent, no clever scheduling gets them back. CPU pressure looks like high
+        <code>%user</code> or <code>%sys</code> in <code>top</code>, and the fix is either fewer cycles per request or
+        more cores.
+      </p>
+
+      <h3>RAM — capacity and bandwidth</h3>
+
+      <p>
+        RAM is two resources in one suit: <strong>capacity</strong> (how much fits) and
+        <strong>bandwidth</strong> (how fast you can stream it). At a million in-flight requests, even 1 KB of state per
+        request is a gigabyte. Caches, hash tables, connection buffers, sort scratch space, deserialized objects — they
+        all live here. Run out of capacity and you spill to disk (death). Run out of bandwidth and the CPU starves while
+        it waits for cache lines.
+      </p>
+
+      <h3>Disk — IOPS and throughput</h3>
+
+      <p>
+        Disk is what survives a power cut. NVMe SSDs do hundreds of thousands of
+        <a class="glink" href="../glossary.html#iops">IOPS</a> and a few GB/s of bandwidth; spinning disks do ~150 IOPS
+        and ~150 MB/s. Almost every request that "writes to the database" is really queueing a disk write somewhere. At
+        1M req/s, even 10% disk-touching requests is 100K IOPS — that's a real provisioning problem, not a footnote.
+      </p>
+
+      <h3>Network — bandwidth and packets</h3>
+
+      <p>
+        Network has two limits people forget are separate: <strong>bandwidth</strong> (Gbps) and
+        <strong>packets per second</strong>. A 10 Gbps NIC can move ~1.25 GB/s of payload, but only after it punches
+        through ~1–2 million packets/sec of OS overhead. A flood of tiny requests can saturate
+        <em>packets</em> long before <em>bytes</em>. And every request that calls another service spends RTTs on top of
+        its own work.
+      </p>
+
+      <h2 id="profiles"><span class="num">03</span>Five requests, five pressure profiles</h2>
+
+      <p>
+        Here's the same "1M req/s" shaped five different ways. Read the chart like a small bar chart per row:
+        <strong>each row is one kind of request</strong>, the
+        <strong>four columns are the four hardware components</strong>, and the
+        <strong>height of each bar is how hard that request leans on that component</strong>. The orange bar is the
+        <a class="glink" href="../glossary.html#bottleneck">bottleneck</a> — the one that fills up first — and the label
+        on the right names <em>which</em> resource of that component runs out (a network bottleneck can be packets/sec
+        or bytes/sec, and they're not the same thing).
+      </p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — The same RPS, five different shapes</div>
+        <svg viewBox="0 0 640 500" xmlns="http://www.w3.org/2000/svg">
+          <text x="220" y="28" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">CPU</text>
+          <text x="300" y="28" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">RAM</text>
+          <text x="380" y="28" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">DISK</text>
+          <text x="460" y="28" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">NETWORK</text>
+          <line x1="180" y1="38" x2="540" y2="38" stroke="var(--rule)" stroke-width="1" />
+
+          <text x="0" y="86" class="svg-text-bold" fill="var(--ink)">Health check</text>
+          <text x="0" y="104" class="svg-text-muted">tiny GET · no DB</text>
+          <rect x="205" y="106" width="30" height="14" fill="var(--rule)" />
+          <rect x="285" y="104" width="30" height="16" fill="var(--rule)" />
+          <rect x="365" y="113" width="30" height="7" fill="var(--rule)" />
+          <rect x="445" y="60" width="30" height="60" fill="var(--accent)" />
+          <text x="555" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">pps cap</text>
+          <line x1="180" y1="120" x2="540" y2="120" stroke="var(--rule)" stroke-width="0.5" stroke-dasharray="2 3" />
+
+          <text x="0" y="166" class="svg-text-bold" fill="var(--ink)">Password hash</text>
+          <text x="0" y="184" class="svg-text-muted">bcrypt cost 12</text>
+          <rect x="205" y="140" width="30" height="60" fill="var(--accent)" />
+          <rect x="285" y="186" width="30" height="14" fill="var(--rule)" />
+          <rect x="365" y="193" width="30" height="7" fill="var(--rule)" />
+          <rect x="445" y="184" width="30" height="16" fill="var(--rule)" />
+          <text x="555" y="172" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">cores</text>
+          <line x1="180" y1="200" x2="540" y2="200" stroke="var(--rule)" stroke-width="0.5" stroke-dasharray="2 3" />
+
+          <text x="0" y="246" class="svg-text-bold" fill="var(--ink)">Cache lookup</text>
+          <text x="0" y="264" class="svg-text-muted">Redis hot key</text>
+          <rect x="205" y="262" width="30" height="18" fill="var(--rule)" />
+          <rect x="285" y="220" width="30" height="60" fill="var(--accent)" />
+          <rect x="365" y="273" width="30" height="7" fill="var(--rule)" />
+          <rect x="445" y="248" width="30" height="32" fill="var(--rule)" />
+          <text x="555" y="252" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">RAM b/w</text>
+          <line x1="180" y1="280" x2="540" y2="280" stroke="var(--rule)" stroke-width="0.5" stroke-dasharray="2 3" />
+
+          <text x="0" y="326" class="svg-text-bold" fill="var(--ink)">Order write</text>
+          <text x="0" y="344" class="svg-text-muted">DB INSERT + fsync</text>
+          <rect x="205" y="345" width="30" height="15" fill="var(--rule)" />
+          <rect x="285" y="343" width="30" height="17" fill="var(--rule)" />
+          <rect x="365" y="300" width="30" height="60" fill="var(--accent)" />
+          <rect x="445" y="346" width="30" height="14" fill="var(--rule)" />
+          <text x="555" y="332" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">fsync IOPS</text>
+          <line x1="180" y1="360" x2="540" y2="360" stroke="var(--rule)" stroke-width="0.5" stroke-dasharray="2 3" />
+
+          <text x="0" y="406" class="svg-text-bold" fill="var(--ink)">Video segment</text>
+          <text x="0" y="424" class="svg-text-muted">2 MB MP4 chunk</text>
+          <rect x="205" y="428" width="30" height="12" fill="var(--rule)" />
+          <rect x="285" y="422" width="30" height="18" fill="var(--rule)" />
+          <rect x="365" y="418" width="30" height="22" fill="var(--rule)" />
+          <rect x="445" y="380" width="30" height="60" fill="var(--accent)" />
+          <text x="555" y="412" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">Gbps</text>
+          <line x1="180" y1="440" x2="540" y2="440" stroke="var(--rule)" stroke-width="0.5" stroke-dasharray="2 3" />
+
+          <rect x="200" y="468" width="14" height="14" fill="var(--rule)" />
+          <text x="222" y="479" class="svg-text-muted">low/medium pressure</text>
+          <rect x="350" y="468" width="14" height="14" fill="var(--accent)" />
+          <text x="372" y="479" class="svg-text-muted">the bottleneck — fills up first</text>
+        </svg>
+        <p class="figure-caption">
+          Same 1M req/s, five different request types, five different bottlenecks. Two of the rows (health check and
+          video segment) both bottleneck on Network — but on <em>different</em> network resources: tiny requests run out
+          of packets-per-second long before bytes-per-second, while video chunks run out of bytes-per-second long before
+          packets-per-second. Same column, same height, different fix. The component bar tells you where to look; the
+          right-hand label tells you what specifically ran out.
+        </p>
+      </div>
+
+      <h3>1. Health check — network-bound (packets)</h3>
+
+      <p>
+        A 50-byte GET that returns "OK" does almost nothing on the CPU and zero work on disk. At 1M req/s, what
+        saturates is <em>packets per second</em> — the NIC and the kernel network stack handling 1M tiny TCP exchanges.
+        Bytes are trivial (50 MB/s), but each one is its own packet, and the per-packet overhead is the limit. The fix
+        is fewer, fatter requests (HTTP/2, batched probes) — not more cores.
+      </p>
+
+      <h3>2. Password hash — CPU-bound</h3>
+
+      <p>
+        A login request with <a class="glink" href="../glossary.html#bcrypt"><code>bcrypt</code></a> at cost factor 12
+        spends ~250 ms of pure CPU per request. One core does ~4 logins/sec. To do 1M req/s you'd need 250,000 cores —
+        which is why nobody does 1M logins/sec, and why login pages are the textbook place to put a
+        <a class="glink" href="../glossary.html#cdn">CDN</a>, a queue, or a rate limit. The pressure isn't the network or
+        the database; it's that a deliberately-slow function multiplied by RPS is a CPU mountain.
+      </p>
+
+      <h3>3. Cache lookup — RAM-bound</h3>
+
+      <p>
+        A Redis <code>GET</code> on a hot key reads a ~1 KB value from RAM and ships it back. CPU is light; disk is
+        untouched; bandwidth is fine. What gets squeezed is <strong>memory bandwidth</strong> on the cache box — every
+        value travels DRAM → CPU → NIC, and at 1M req/s that's 1 GB/s of memory traffic per server before you count
+        metadata. Add 100K connections and the working set of TCP state itself starts to evict your hot
+        <a class="glink" href="../glossary.html#cache-line">cache lines</a>. RAM capacity matters; RAM bandwidth matters
+        more than people think.
+      </p>
+
+      <h3>4. Order write — disk-bound</h3>
+
+      <p>
+        An <code>INSERT</code> into Postgres has to durably hit disk before it can return — that's what "committed"
+        means. Each commit is at least one <a class="glink" href="../glossary.html#fsync">fsync</a> to the
+        <a class="glink" href="../glossary.html#wal">write-ahead log</a>. NVMe fsyncs run ~10–50 µs each; you can pull
+        tens of thousands per second per disk, not millions. At 1M req/s of writes, the disk runs out before anything
+        else does. The fix isn't bigger CPUs — it's batching commits, sharding writes across many disks, or relaxing
+        durability per request.
+      </p>
+
+      <h3>5. Video segment — network-bound (bytes)</h3>
+
+      <p>
+        A 2 MB <a class="glink" href="../glossary.html#hls">HLS</a> chunk is small CPU (already encoded), small disk
+        (probably <a class="glink" href="../glossary.html#page-cache">page-cached</a>), small RAM, but 2 MB out the door.
+        At 1M req/s, that's <strong>2 TB/s of egress</strong> — physically impossible from one rack. Real video systems
+        don't serve from one box; they spread the bandwidth across a CDN, geographically close to viewers, where each
+        edge box only handles a sliver. The whole architecture exists to spread the network bar.
+      </p>
+
+      <div class="callout">
+        <div class="callout-label">There is no correct answer</div>
+        Five requests, five different limiting hardware components, five different fixes. "How do you handle 1M req/s?"
+        has no answer that doesn't start with "tell me about one request." The shape of the request decides everything
+        that follows.
+      </div>
+
+      <h2 id="shape"><span class="num">04</span>Reading the pressure shape</h2>
+
+      <p>
+        Once you know how to look, every request has a recognizable shape. A useful exercise: before you write code,
+        sketch which of the four bars will be tallest. You're usually right, and when you're wrong it's because there's
+        a hidden cost — a network call inside a "compute" function, a fsync inside an "in-memory" cache, an O(n²) inside
+        a "lookup."
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Workload smell</th>
+            <th>Likely bottleneck</th>
+            <th>Tell-tale metric</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Crypto, compression, regex, ML inference</td>
+            <td>CPU</td>
+            <td class="mono">%user near 100%</td>
+          </tr>
+          <tr>
+            <td>Big in-memory tables, JSON parsing, sorts</td>
+            <td>RAM bandwidth</td>
+            <td class="mono">cache-miss rate, IPC drop</td>
+          </tr>
+          <tr>
+            <td>Durable writes, log appends, fsync</td>
+            <td>Disk IOPS</td>
+            <td class="mono">iostat util%, fsync latency</td>
+          </tr>
+          <tr>
+            <td>Large blobs, file downloads, video</td>
+            <td>Network bandwidth</td>
+            <td class="mono">NIC at line rate</td>
+          </tr>
+          <tr>
+            <td>Lots of tiny requests, RPC chatter</td>
+            <td>Network packets/sec</td>
+            <td class="mono">softirq high, NIC pps cap</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        The mistake every junior engineer makes once: assuming "more requests" always means "more CPU." It often
+        doesn't. A web server pegged at 5% CPU but at line-rate on the NIC is just as stuck as one at 100% CPU — the
+        wall is just somewhere else. Looking at one number lies; looking at all four tells you which lever to pull.
+      </p>
+
+      <h2 id="capacity"><span class="num">05</span>From shape to capacity plan</h2>
+
+      <p>
+        The pressure profile is also a budget. Once you know which component dominates, you can do crude arithmetic and
+        get a number that's right to within a factor of ten. That's the whole game of
+        <a href="../craft/back-of-envelope.html">back-of-the-envelope estimation</a>; this is its raw material.
+      </p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>If CPU dominates</h4>
+          <p>
+            Cycles per request × RPS = total cycles needed. Divide by per-core cycles/sec. That's your core count. Add
+            headroom. Now you know how many boxes — or whether the algorithm itself has to change.
+          </p>
+        </div>
+        <div class="card">
+          <h4>If RAM dominates</h4>
+          <p>
+            Bytes per request × concurrent requests = working set. Plus your caches. Plus the OS. If it doesn't fit,
+            you're spilling to disk and your RAM-bound workload becomes a disk-bound one — silently and catastrophically.
+          </p>
+        </div>
+        <div class="card">
+          <h4>If disk dominates</h4>
+          <p>
+            IOPS per request × RPS = required IOPS. Match against your disk's spec sheet. If it doesn't fit on one disk,
+            you shard, batch writes, or relax durability. There is no software trick that beats the seek time of a
+            spinning disk.
+          </p>
+        </div>
+        <div class="card">
+          <h4>If network dominates</h4>
+          <p>
+            Bytes per request × RPS = bits per second. Compare against
+            <a class="glink" href="../glossary.html#line-rate">NIC line rate</a> and upstream bandwidth caps. Pps-bound?
+            Make requests bigger, batched, or routed through fewer hops. Bytes-bound? CDN, edge caching, compression.
+          </p>
+        </div>
+      </div>
+
+      <p>
+        Once one of these numbers is bigger than the box you can buy, you're not optimizing — you're
+        <em>scaling out</em>, which is a different game (sharding, partitioning, fanning across racks). But the first
+        move is always the same: figure out which bar is the tallest, and aim everything at that one.
+      </p>
+
+      <h2 id="takeaway"><span class="num">06</span>The one-line takeaway</h2>
+
+      <p class="pullquote">
+        "1M req/s" is a meaningless number until you know what one request costs and which component pays. Find the
+        tallest bar; everything else is decoration.
+      </p>
+
+      <p>
+        System design questions sound like quantitative puzzles ("scale this to N users") but they're really qualitative
+        ones — what is the work, where does it land, what fills up first. Two engineers handed the same RPS target will
+        design different systems if they imagine different requests. Always force the question down to one request, on
+        one box, against one bottleneck. The architecture falls out from there.
+      </p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#bottleneck">bottleneck</a><a href="../glossary.html#iops">IOPS</a><a href="../glossary.html#pps">pps</a><a href="../glossary.html#fsync">fsync</a><a href="../glossary.html#wal">WAL</a><a href="../glossary.html#nic">NIC</a><a href="../glossary.html#line-rate">line rate</a><a href="../glossary.html#cdn">CDN</a><a href="../glossary.html#bcrypt">bcrypt</a><a href="../glossary.html#hls">HLS</a><a href="../glossary.html#page-cache">page cache</a><a href="../glossary.html#working-set">working set</a><a href="../glossary.html#cache-line">cache line</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="memory-hierarchy.html">
+              <span class="related-arrow">→</span>
+              <span>Memory Hierarchy</span>
+              <span class="related-summary">— sets the speed limits this page is about pressuring.</span>
+            </a>
+          </li>
+          <li>
+            <a href="cache-locality.html">
+              <span class="related-arrow">→</span>
+              <span>Cache Locality &amp; Branch Prediction</span>
+              <span class="related-summary">— why same-O algorithms can differ by 10× on real silicon.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../craft/back-of-envelope.html">
+              <span class="related-arrow">→</span>
+              <span>Back-of-the-Envelope Estimation</span>
+              <span class="related-summary">— turns a pressure shape into a number you can defend.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Hardware. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

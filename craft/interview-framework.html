@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The 6-Step Interview Framework — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Craft</a></div>
+        <h1>The 6-Step Interview <em>Framework</em></h1>
+        <p class="deck">System design interviews look open-ended, but the candidates who pass treat them as a structured walk through six well-defined steps.</p>
+        <div class="meta">
+          <span class="class-pill meta">Meta</span>
+          <span>Theme · Craft</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#why">Why a framework at all</a></li>
+          <li><a href="#overview">The six steps at a glance</a></li>
+          <li><a href="#step1">Step 1 — Clarify requirements</a></li>
+          <li><a href="#step2">Step 2 — Back-of-the-envelope estimation</a></li>
+          <li><a href="#step3">Step 3 — API design</a></li>
+          <li><a href="#step4">Step 4 — High-level design</a></li>
+          <li><a href="#step5">Step 5 — Data model</a></li>
+          <li><a href="#step6">Step 6 — Deep dive &amp; bottlenecks</a></li>
+          <li><a href="#timebox">Time-boxing &amp; pacing</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">"Design Twitter." "Design a URL shortener." "Design Uber dispatch." The prompt is always one sentence, and the page on the whiteboard is always blank. The trap is to start drawing boxes — load balancer, app servers, MySQL — before anyone has agreed on what's being built, how big it is, or which of a hundred features the interviewer actually cares about. The framework on this page is the antidote: six steps, in order, with a time-box for each.</p>
+
+      <p>This isn't an interview-only tool. The same six steps describe how working engineers approach a real design doc — clarify, size, define the contract, sketch the system, choose the data model, then go deep on the parts that will actually break. The interview is just a 45-minute compression of that real process.</p>
+
+      <h2 id="why"><span class="num">01</span>Why a framework at all</h2>
+
+      <p>The most common interview failure isn't getting a hard question wrong. It's spending five minutes drawing six boxes — client, load balancer, web servers, cache, database, queue — and then defending those boxes for the next forty. The candidate never asked what the system does. The interviewer never heard them justify a single decision. Forty minutes of motion, zero progress.</p>
+
+      <p>A framework prevents that. It forces you to answer cheap questions first (what is this? how big?) before expensive ones (which database? what's the schema?). Each step's output is the next step's input. The boxes-and-arrows diagram you eventually draw is justified because it sits on top of explicit numbers, an explicit API, and explicit non-functional requirements.</p>
+
+      <div class="callout">
+        <div class="callout-label">The misconception this corrects</div>
+        Beginners think a system design interview is a test of how many components you know — Kafka, Cassandra, Redis, ELB, S3. It isn't. It's a test of how you reason under ambiguity. The framework shows the interviewer that you don't start with components; you start with the problem, and the components <em>fall out</em> of constraints you established yourself.
+      </div>
+
+      <h2 id="overview"><span class="num">02</span>The six steps at a glance</h2>
+
+      <p>Every step has one job, one artifact, and a time-box. The artifact is what should be visible on the whiteboard when that step ends. If it isn't, you're not done with the step.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — A 45-minute interview, divided</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <text x="320" y="28" text-anchor="middle" class="svg-text-muted">Total: 45 min · widths proportional to time</text>
+
+          <rect x="40" y="70" width="62" height="60" fill="var(--s1-soft)" stroke="var(--s1)" stroke-width="1.5" />
+          <text x="71" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">01</text>
+          <text x="71" y="112" text-anchor="middle" class="svg-text-small" fill="var(--ink)">Clarify</text>
+          <text x="71" y="148" text-anchor="middle" class="svg-text-muted">5 min</text>
+
+          <rect x="102" y="70" width="62" height="60" fill="var(--s1-soft)" stroke="var(--s1)" stroke-width="1.5" />
+          <text x="133" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">02</text>
+          <text x="133" y="112" text-anchor="middle" class="svg-text-small" fill="var(--ink)">Estimate</text>
+          <text x="133" y="148" text-anchor="middle" class="svg-text-muted">5 min</text>
+
+          <rect x="164" y="70" width="62" height="60" fill="var(--s2-soft)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="195" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">03</text>
+          <text x="195" y="112" text-anchor="middle" class="svg-text-small" fill="var(--ink)">API</text>
+          <text x="195" y="148" text-anchor="middle" class="svg-text-muted">5 min</text>
+
+          <rect x="226" y="70" width="124" height="60" fill="var(--s2-soft)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="288" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">04</text>
+          <text x="288" y="112" text-anchor="middle" class="svg-text-small" fill="var(--ink)">High-level design</text>
+          <text x="288" y="148" text-anchor="middle" class="svg-text-muted">10 min</text>
+
+          <rect x="350" y="70" width="62" height="60" fill="var(--s2-soft)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="381" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">05</text>
+          <text x="381" y="112" text-anchor="middle" class="svg-text-small" fill="var(--ink)">Data</text>
+          <text x="381" y="148" text-anchor="middle" class="svg-text-muted">5 min</text>
+
+          <rect x="412" y="70" width="187" height="60" fill="var(--s3-soft)" stroke="var(--s3)" stroke-width="1.5" />
+          <text x="505" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">06</text>
+          <text x="505" y="112" text-anchor="middle" class="svg-text-small" fill="var(--ink)">Deep dive &amp; bottlenecks</text>
+          <text x="505" y="148" text-anchor="middle" class="svg-text-muted">15 min</text>
+
+          <line x1="40" y1="178" x2="164" y2="178" stroke="var(--s1)" stroke-width="2" />
+          <text x="102" y="200" text-anchor="middle" class="svg-text-small" fill="var(--s1)">SCOPE</text>
+          <text x="102" y="216" text-anchor="middle" class="svg-text-muted">what · how big</text>
+
+          <line x1="164" y1="178" x2="412" y2="178" stroke="var(--s2)" stroke-width="2" />
+          <text x="288" y="200" text-anchor="middle" class="svg-text-small" fill="var(--s2)">DESIGN</text>
+          <text x="288" y="216" text-anchor="middle" class="svg-text-muted">contract · shape · schema</text>
+
+          <line x1="412" y1="178" x2="599" y2="178" stroke="var(--s3)" stroke-width="2" />
+          <text x="505" y="200" text-anchor="middle" class="svg-text-small" fill="var(--s3)">HARDEN</text>
+          <text x="505" y="216" text-anchor="middle" class="svg-text-muted">where it breaks</text>
+
+          <text x="320" y="258" text-anchor="middle" class="svg-text-muted">Artifact at the end of each step:</text>
+          <text x="71" y="282" text-anchor="middle" class="svg-text-small" fill="var(--ink)">req list</text>
+          <text x="133" y="282" text-anchor="middle" class="svg-text-small" fill="var(--ink)">QPS · GB</text>
+          <text x="195" y="282" text-anchor="middle" class="svg-text-small" fill="var(--ink)">endpoints</text>
+          <text x="288" y="282" text-anchor="middle" class="svg-text-small" fill="var(--ink)">box-and-arrow</text>
+          <text x="381" y="282" text-anchor="middle" class="svg-text-small" fill="var(--ink)">schema</text>
+          <text x="505" y="282" text-anchor="middle" class="svg-text-small" fill="var(--ink)">trade-offs &amp; failure modes</text>
+        </svg>
+        <p class="figure-caption">The framework as a stacked timeline. The two scoping steps (blue) define the problem; the three design steps (green) define the system; the deep-dive step (amber) is where the interviewer learns whether you actually understand what you drew. Bar widths reflect time-boxes — note that the deep dive takes a third of the whole interview by itself.</p>
+      </div>
+
+      <h2 id="step1"><span class="num">03</span>Step 1 — Clarify requirements</h2>
+
+      <p>The interviewer's prompt is deliberately under-specified. "Design Twitter" could mean three different systems depending on whether you focus on the timeline read path, the post write path, or the celebrity fan-out problem. Step 1 is where you turn one sentence into a scoped problem statement that you and the interviewer agree on.</p>
+
+      <p>You're collecting two kinds of requirements. <strong>Functional</strong> requirements are what the system <em>does</em> — post a tweet, follow a user, read a timeline. <strong>Non-functional</strong> requirements are how it has to behave — latency targets, availability, scale, consistency expectations. Both matter; non-functional is what most candidates skip.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Functional questions</h4>
+          <p>Which features are in scope? What does a user actually do? What can we cut? "Are DMs in scope, or just the public timeline?" "Does follow have to be bidirectional?"</p>
+        </div>
+        <div class="card">
+          <h4>Non-functional questions</h4>
+          <p>How many users? Read-heavy or write-heavy? What's the latency budget? How available — three nines or four? Which inconsistencies are tolerable? "Is a 30-second stale timeline OK?"</p>
+        </div>
+      </div>
+
+      <p>Write the answers down on the whiteboard as a numbered list. Two columns — <em>functional</em> on the left, <em>non-functional</em> on the right. This list is the contract you and the interviewer just agreed on. Everything you draw next has to be justifiable against it.</p>
+
+      <h2 id="step2"><span class="num">04</span>Step 2 — Back-of-the-envelope estimation</h2>
+
+      <p>Now you turn the non-functional answers from Step 1 into numbers. DAU → QPS. QPS × payload → bandwidth. Records × size × replication → storage. Hot-set fraction × storage → cache size. Five minutes of multiplication, no calculator, no precision — just rough numbers that fix the regime you're working in.</p>
+
+      <p>Why does this matter so much? Because the answer to "single MySQL or sharded NoSQL?" is decided by an order of magnitude on these numbers, not by aesthetics. 5 GB/day is a single VM. 5 TB/day is a sharded cluster. 5 PB/day is a different architecture entirely. You can't reason about any of that without first writing the numbers down.</p>
+
+      <p>The full method — the powers-of-two cheat sheet, the four-step funnel, and two worked examples (Twitter timeline and YouTube storage) — lives on the dedicated <a href="back-of-envelope.html">back-of-the-envelope</a> page. For the framework, you only need to remember three things: aim for 10× accuracy, peak ≈ 3× average, and replication multiplies storage but not request volume.</p>
+
+      <div class="callout">
+        <div class="callout-label">What lands on the whiteboard</div>
+        A small numeric table: <code>DAU · QPS_read · QPS_write · storage/day · storage/year · cache size</code>. Six numbers, written legibly in a corner. You'll point at them five times in the next forty minutes — when you size the database, when you justify a cache, when you decide on async, when you pick a sharding strategy, when you size the failure domain.
+      </div>
+
+      <h2 id="step3"><span class="num">05</span>Step 3 — API design</h2>
+
+      <p>This is where you commit to the system's <em>contract</em> — the public surface that clients call and that everything inside has to support. Endpoints, methods, request and response shapes, error codes, idempotency keys, pagination tokens. Five focused minutes; this isn't a full OpenAPI spec, it's the dozen calls that cover the functional requirements from Step 1.</p>
+
+      <p>The discipline here matters because the API forces you to be specific. "Post a tweet" becomes <code>POST /tweets</code> with a body of <code>{text, media_ids}</code> and a response of <code>{tweet_id, created_at}</code>. Now you've committed to a tweet ID type (string? int? UUID? snowflake?), a maximum payload size, a synchronous vs async write, and an error contract. Each of those choices has downstream consequences for the next three steps.</p>
+
+      <div class="callout">
+        <div class="callout-label">Why API design comes <em>before</em> high-level design</div>
+        Because the API is the boundary between client behavior and server architecture. Once you know the calls, you know what state has to be readable, what writes have to be durable, what can be eventually consistent, and what has to fan out. Drawing a load balancer before knowing whether the system has 6 endpoints or 600 is premature.
+      </div>
+
+      <h2 id="step4"><span class="num">06</span>Step 4 — High-level design</h2>
+
+      <p>Now — and only now — you start drawing boxes. Client → CDN → load balancer → app servers → cache → database. Maybe a queue for async work, maybe a separate read-path service, maybe a CDN tier for static assets. Ten minutes; this is the "main diagram" the interviewer remembers.</p>
+
+      <p>The goal is a <em>data-flow</em> diagram, not a technology shopping list. For each box, say what it does, not just what it is. "An app server" is weak. "A stateless app tier behind an L7 load balancer that fans the request out to a write path (synchronous, persisted to the primary) and a fan-out worker (async, pushed to followers' inbox cache)" tells the interviewer you've thought about it.</p>
+
+      <p>This is also where Distribution and Performance show up. Decisions like "do we shard?" lean on <a href="../distribution/consistent-hashing.html">consistent hashing</a>; decisions like "what happens during a regional outage?" lean on <a href="../distribution/cap-theorem.html">CAP</a>; decisions about cache, queue, and back-pressure lean on <a href="../reliability/resilience-patterns.html">resilience patterns</a>. The framework doesn't replace those topics — it tells you when to apply them.</p>
+
+      <h2 id="step5"><span class="num">07</span>Step 5 — Data model</h2>
+
+      <p>You have an API. You have a high-level diagram. Now you commit to the schema — tables (or collections, or key-value layouts), primary keys, secondary indexes, sharding key, and the relationships between entities. Five minutes; you don't need every column, just the ones that drive design decisions.</p>
+
+      <p>The hard questions here aren't field names. They're:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>SQL or NoSQL?</h4>
+          <p>If your access pattern is "look up by primary key" and your scale is huge, NoSQL. If you need joins, transactions, and ad-hoc queries, SQL. Hybrid is common: SQL for the truth, key-value for hot reads.</p>
+        </div>
+        <div class="card">
+          <h4>What's the partition key?</h4>
+          <p>Once data is sharded, every query either includes the partition key (cheap) or fans out to all shards (expensive). The shard key is often the single highest-leverage decision in the design. Get it wrong and every read is a scatter-gather.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Common trap</div>
+        Drawing a normalised, third-normal-form ER diagram for a system that you just sized at 30k QPS. At that scale, denormalisation isn't a code smell — it's the design. Duplicate data, store the user's display name on the tweet row, accept that a profile rename is now a fan-out job. The schema follows the access pattern, not vice versa.
+      </div>
+
+      <h2 id="step6"><span class="num">08</span>Step 6 — Deep dive &amp; bottlenecks</h2>
+
+      <p>This is the third of the interview that decides the outcome. The interviewer picks one or two components from your high-level diagram and asks you to go deep. <em>"Walk me through what happens when a celebrity with 50M followers posts. Where's the bottleneck? What breaks first?"</em></p>
+
+      <p>You're not done until you've talked about three things for at least one hot component: <strong>the bottleneck</strong>, <strong>the failure mode</strong>, and <strong>the trade-off</strong>. The bottleneck is where load piles up first. The failure mode is what happens when that component is gone (network partition? hot shard? slow disk?). The trade-off is what you'd give up to relieve the pressure.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Three lenses for the deep dive</div>
+        <svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="40" width="170" height="140" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="125" y="68" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">Bottleneck</text>
+          <text x="125" y="100" text-anchor="middle" class="svg-text-small" fill="var(--ink)">Slowest stage</text>
+          <text x="125" y="120" text-anchor="middle" class="svg-text-muted">caps total throughput</text>
+          <text x="125" y="148" text-anchor="middle" class="svg-text-small" fill="var(--ink)">"DB writes saturate at 30k"</text>
+
+          <rect x="235" y="40" width="170" height="140" fill="var(--paper-warm)" stroke="var(--s4)" stroke-width="1.5" />
+          <text x="320" y="68" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">Failure mode</text>
+          <text x="320" y="100" text-anchor="middle" class="svg-text-small" fill="var(--ink)">What breaks first</text>
+          <text x="320" y="120" text-anchor="middle" class="svg-text-muted">when something is gone</text>
+          <text x="320" y="148" text-anchor="middle" class="svg-text-small" fill="var(--ink)">"AZ-2 dies; cache cold"</text>
+
+          <rect x="430" y="40" width="170" height="140" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="515" y="68" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Trade-off</text>
+          <text x="515" y="100" text-anchor="middle" class="svg-text-small" fill="var(--ink)">What you'd give up</text>
+          <text x="515" y="120" text-anchor="middle" class="svg-text-muted">to relieve the pressure</text>
+          <text x="515" y="148" text-anchor="middle" class="svg-text-small" fill="var(--ink)">"Async fan-out → stale 30s"</text>
+        </svg>
+        <p class="figure-caption">For any hot component the interviewer probes, name the bottleneck (where load piles up), the failure mode (what happens when it's gone), and the trade-off (what you'd accept to relieve it). Hitting all three on a single component is what "deep dive" actually means.</p>
+      </div>
+
+      <p>Specific tools to reach for during the deep dive:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>The bottleneck rule</strong> — total throughput is set by the slowest stage. See <a href="../performance/throughput.html">throughput</a>.</li>
+        <li><strong>Little's Law</strong> — concurrency = throughput × latency. Use it to size pools, queues, and worker counts. See <a href="../performance/latency-throughput.html">latency &amp; throughput</a>.</li>
+        <li><strong>p99 not average</strong> — the tail is what users feel. Hedged requests, redundant fan-out, request coalescing. See <a href="../performance/latency.html">latency</a>.</li>
+        <li><strong>Resilience patterns</strong> — retries with jitter, circuit breakers, bulkheads, load shedding. See <a href="../reliability/resilience-patterns.html">resilience patterns</a>.</li>
+        <li><strong>CAP for partitions</strong> — pick CP or AP per operation, not per system. See <a href="../distribution/cap-theorem.html">CAP</a>.</li>
+      </ul>
+
+      <p>The strongest signal you can give in this step isn't naming a famous tool — it's saying "the bottleneck here is X. If we relieve it with Y, we pay Z. I'd rather pay Z than X because <em>this part of Step 1's requirements</em>." Closing the loop back to the requirements is what separates senior reasoning from junior pattern-matching.</p>
+
+      <h2 id="timebox"><span class="num">09</span>Time-boxing &amp; pacing</h2>
+
+      <p>The time-boxes in Figure 01 aren't suggestions. They're the difference between finishing the interview and getting cut off in the data model with no deep dive done. Two pacing rules to internalise:</p>
+
+      <p><strong>Steps 1–3 are cheap. Don't overspend.</strong> You can blow ten minutes on requirements and feel productive — you're talking, the interviewer is nodding — but you've used 22% of your time on a step that should have taken 11%. If a requirement is genuinely ambiguous, write down two interpretations and move on. You can come back.</p>
+
+      <p><strong>Step 6 is where the signal is. Protect it.</strong> Most candidates run out of time in Step 5. The fix isn't to talk faster in Step 5; it's to spend less in Steps 1–3. The interviewer is going to grade you mostly on what you said in the deep dive. A polished requirements list with no deep dive is a fail. A scrappy schema with a strong deep dive is a pass.</p>
+
+      <div class="callout">
+        <div class="callout-label">Pacing for longer or shorter slots</div>
+        60-min interview: scale up roughly 7 / 7 / 7 / 12 / 7 / 20. The deep dive grows the most.<br />
+        30-min screen: skip Step 5 entirely (mention the schema in one sentence inside Step 4) and aim for 4 / 4 / 4 / 8 / — / 10.<br />
+        In all cases, Step 6 is the largest single block. If you find yourself shrinking it, you're shrinking the wrong step.
+      </div>
+
+      <h2 id="takeaway"><span class="num">10</span>The one-line takeaway</h2>
+
+      <p class="pullquote">Scope before you size, size before you sketch, sketch before you go deep — and protect the deep dive at all costs.</p>
+
+      <p>That's the framework in one sentence. Steps 1–2 scope the problem. Steps 3–5 sketch the system. Step 6 is where the interviewer learns whether you understood what you drew. Every minute you save in the early steps is a minute you can spend in the last one, and the last one is what gets you hired.</p>
+
+      <p>The framework looks rigid on paper, but it isn't. It's a default — a path of least resistance through a problem you've never seen before. Once you've used it in five or six designs, you'll start jumping between steps fluidly: a Step-6 failure mode forces you to revisit a Step-4 box, a Step-2 number invalidates a Step-1 requirement. That's normal. The framework isn't a script. It's a checklist that makes sure none of the load-bearing questions go unanswered.</p>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="back-of-envelope.html">
+              <span class="related-arrow">→</span>
+              <span>Back-of-the-Envelope Estimation</span>
+              <span class="related-summary">— a deep dive on Step 2.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../performance/latency-throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Latency &amp; Throughput</span>
+              <span class="related-summary">— the vocabulary you'll spend Step 6 in.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../reliability/resilience-patterns.html">
+              <span class="related-arrow">→</span>
+              <span>Resilience Patterns</span>
+              <span class="related-summary">— the toolbox for the failure-mode lens.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Meta · Craft theme. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

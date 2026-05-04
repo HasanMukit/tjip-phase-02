@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Execution model — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="theme-page">
+      <header class="theme-header">
+        <div class="eyebrow">Theme 02 — Execution model</div>
+        <h1>Many things at <em>once</em>.</h1>
+        <p class="deck">
+          The OS abstractions over hardware cycles. Processes are memory boundaries; threads are execution cursors;
+          the event loop is concurrency without parallelism. Each abstraction has a cost — this theme is where it
+          shows up.
+        </p>
+      </header>
+
+      <div class="topic-rows">
+        <a href="process-vs-thread.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Process vs Thread</h3>
+            <p>A process is a memory boundary; a thread is an execution cursor. The thread's "private kit" lives in registers while running and in the PCB while paused.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="concurrency-vs-parallelism.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Concurrency vs Parallelism</h3>
+            <p>Rob Pike's distinction: composition vs. simultaneous execution. Four combinations of the two.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="event-loop.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>The Event Loop</h3>
+            <p>JavaScript's single-threaded model. Microtasks vs macrotasks, why <code>setTimeout(0)</code> isn't 0, and the cardinal rule: never block the loop.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="context-switching.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Context Switching</h3>
+            <p>What the OS does on a thread switch. Direct vs indirect cost, the throughput-vs-thread-count cliff, the C10K problem.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="core-pinning.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Core Pinning</h3>
+            <p>Trading the kernel's load balancing for cache continuity. Right answer for HFT/DPDK; wrong answer for general-purpose servers.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Theme 02 of 06. <a href="../hardware/index.html" style="color: var(--accent)">← Hardware</a> · <a href="../distribution/index.html" style="color: var(--accent)">Next: Distribution →</a>
+    </footer>
+  </body>
+</html>

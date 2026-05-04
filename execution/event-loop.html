@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The JavaScript Event Loop — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Execution model</a></div>
+        <h1>The JavaScript <em>event loop</em></h1>
+        <p class="deck">One thread, one stack, two queues. The whole machinery JavaScript uses to feel concurrent without ever being parallel — and the trap that breaks the moment any single task takes too long.</p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Execution model</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#single">Single-threaded by design</a></li>
+          <li><a href="#parts">Stack, queues, and the loop</a></li>
+          <li><a href="#tick">One tick of the loop</a></li>
+          <li><a href="#micro">Microtasks vs macrotasks</a></li>
+          <li><a href="#timeout">Why <code>setTimeout(0)</code> isn't 0</a></li>
+          <li><a href="#blocking">Never block the loop</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">JavaScript runtimes — the browser, Node.js, Deno, Bun — all share a strange property: they run user code on exactly one thread. No locks, no race conditions, no parallelism. And yet they handle thousands of concurrent connections, animations, network calls, and timers without breaking a sweat. The thing that makes this work is the event loop: a tiny scheduler that picks one task at a time off a queue, runs it to completion on the single thread, and goes back for the next. It's the canonical example of concurrency without parallelism — and it has its own peculiar gotchas, the kind you only understand once you've seen the loop diagrammed.</p>
+
+      <p>This page walks the model: what one thread really means, what the queues are, what one tick does, and where people stub their toes (microtasks vs macrotasks, the lying <code>setTimeout(0)</code>, and the cardinal sin of blocking the loop).</p>
+
+      <h2 id="single"><span class="num">01</span>Single-threaded by design</h2>
+
+      <p>JavaScript was created in 1995 to make web pages interactive. The decision to make it single-threaded wasn't a limitation — it was a <em>feature</em>. Multi-threaded code with shared mutable state is famously hard to get right; race conditions, deadlocks, and torn reads are common bugs even for experienced engineers. JavaScript's authors picked a different deal: <strong>only one piece of code runs at a time</strong>, and any "concurrent" feeling has to come from how cleverly that one piece of code is broken up.</p>
+
+      <p>The trade-off works because most of what a browser does is wait — wait for a click, wait for a network response, wait for a frame to render. While the program is waiting, the thread is idle. The event loop is the machinery that says: "while you're waiting, I'll come grab the next thing on the queue and run it." A single thread is plenty if it's never idle <em>and</em> never blocked.</p>
+
+      <div class="callout">
+        <div class="callout-label">"Single-threaded JavaScript" is more nuanced</div>
+        The <em>JavaScript user code</em> runs on one thread. Behind the scenes, the runtime delegates I/O, timers, file reads, and DNS lookups to other threads or to the OS — Node uses <a class="glink" href="../glossary.html#libuv">libuv</a>, browsers use a constellation of internal threads. Those threads don't run your code; they just call back into the event loop with results. From the JS engineer's seat, it's still one thread.
+      </div>
+
+      <h2 id="parts"><span class="num">02</span>Stack, queues, and the loop</h2>
+
+      <p>The full model has four pieces: the call stack (where the running function lives), the <a class="glink" href="../glossary.html#macrotask">macrotask queue</a> (incoming work like timers and I/O callbacks), the <a class="glink" href="../glossary.html#microtask">microtask queue</a> (a higher-priority lane for promise reactions), and the loop itself that moves work between them.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The four pieces</div>
+        <svg viewBox="0 0 640 380" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="40" width="180" height="240" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="130" y="62" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Call stack</text>
+          <text x="130" y="78" text-anchor="middle" class="svg-text-muted">where running code lives</text>
+
+          <rect x="60" y="220" width="140" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="130" y="245" text-anchor="middle" class="svg-text-bold" fill="white">main / current task</text>
+          <rect x="60" y="180" width="140" height="40" fill="var(--s2)" opacity="0.6" />
+          <text x="130" y="205" text-anchor="middle" class="svg-text-bold" fill="white">callee</text>
+          <rect x="60" y="140" width="140" height="40" fill="var(--s2)" opacity="0.4" />
+          <text x="130" y="165" text-anchor="middle" class="svg-text-bold" fill="white">deeper callee</text>
+
+          <text x="130" y="305" text-anchor="middle" class="svg-text-muted">one task runs to completion</text>
+          <text x="130" y="320" text-anchor="middle" class="svg-text-muted">before the next one starts</text>
+
+          <path d="M 235 160 Q 290 160 290 200 Q 290 240 235 240" fill="none" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr1)" />
+          <text x="290" y="200" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">EVENT</text>
+          <text x="290" y="216" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">LOOP</text>
+
+          <defs>
+            <marker id="arr1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+
+          <rect x="350" y="60" width="240" height="100" rx="6" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="1.2" />
+          <text x="470" y="82" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">Microtask queue</text>
+          <text x="470" y="98" text-anchor="middle" class="svg-text-muted">Promise.then, queueMicrotask</text>
+
+          <rect x="370" y="115" width="50" height="28" fill="var(--s1)" opacity="0.85" />
+          <rect x="425" y="115" width="50" height="28" fill="var(--s1)" opacity="0.7" />
+          <rect x="480" y="115" width="50" height="28" fill="var(--s1)" opacity="0.55" />
+          <text x="555" y="133" class="svg-text-muted">FIFO</text>
+
+          <rect x="350" y="180" width="240" height="100" rx="6" fill="var(--paper-warm)" stroke="var(--s3)" stroke-width="1.2" />
+          <text x="470" y="202" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">Macrotask queue</text>
+          <text x="470" y="218" text-anchor="middle" class="svg-text-muted">setTimeout, I/O, DOM events</text>
+
+          <rect x="370" y="235" width="50" height="28" fill="var(--s3)" opacity="0.85" />
+          <rect x="425" y="235" width="50" height="28" fill="var(--s3)" opacity="0.7" />
+          <rect x="480" y="235" width="50" height="28" fill="var(--s3)" opacity="0.55" />
+          <text x="555" y="253" class="svg-text-muted">FIFO</text>
+
+          <text x="320" y="335" text-anchor="middle" class="svg-text-muted">microtasks drain completely between every macrotask</text>
+          <text x="320" y="352" text-anchor="middle" class="svg-text-muted">→ a Promise.then runs before the next setTimeout fires</text>
+        </svg>
+        <p class="figure-caption">The call stack runs the current task. The microtask queue holds promise reactions. The macrotask queue holds timer callbacks and I/O completions. The loop empties the stack, drains all the microtasks, then takes one macrotask, and starts again. That ordering is the cause of nearly every "but I scheduled it first…" surprise in JavaScript.</p>
+      </div>
+
+      <h2 id="tick"><span class="num">03</span>One tick of the loop</h2>
+
+      <p>One iteration of the event loop — one "tick" — does these steps in order:</p>
+
+      <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Run one macrotask</strong> from the macrotask queue. Pop it off, push its function onto the call stack, and run until the stack is empty (the function has returned).</li>
+        <li><strong>Drain the microtask queue.</strong> Run every microtask, in order. If a microtask schedules another microtask, run that one too — keep going until the queue is empty.</li>
+        <li><strong>Render</strong> (browser only). If it's time for a frame, the browser does layout, paint, and compositor work. Any <code>requestAnimationFrame</code> callbacks fire here.</li>
+        <li><strong>Go back to step 1.</strong> Pick up the next macrotask. Repeat forever.</li>
+      </ol>
+
+      <p>Two consequences fall out of this. First, <strong>microtasks have priority over macrotasks</strong> — a chain of <code>Promise.then(...).then(...).then(...)</code> all runs before the next <code>setTimeout</code> fires, even if the timer has been waiting longer. Second, <strong>a long-running synchronous task blocks everything</strong>. If a macrotask takes 5 seconds to run, the browser doesn't render, no clicks are processed, no promises resolve, no timers fire. Whoever is staring at the page sees a frozen screen for 5 seconds.</p>
+
+      <h2 id="micro"><span class="num">04</span>Microtasks vs macrotasks</h2>
+
+      <p>The split between the two queues is the most-asked question about the event loop, and it's the source of the trickiest behaviour to predict. The TL;DR:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Microtask</th>
+            <th>Macrotask</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Source</td>
+            <td class="mono">Promise.then, queueMicrotask, MutationObserver</td>
+            <td class="mono">setTimeout, setInterval, I/O, DOM events</td>
+          </tr>
+          <tr>
+            <td>When</td>
+            <td>After current task, before next macrotask</td>
+            <td>One per loop tick (after microtasks drain)</td>
+          </tr>
+          <tr>
+            <td>Drain rule</td>
+            <td>All of them, including ones added during draining</td>
+            <td>Exactly one per tick</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The classic puzzle that catches people:</p>
+
+      <div class="codeblock">console.log('1');
+setTimeout(() =&gt; console.log('2'), 0);
+Promise.resolve().then(() =&gt; console.log('3'));
+console.log('4');</div>
+
+      <p>The output is <code>1, 4, 3, 2</code> — not <code>1, 4, 2, 3</code>, even though the setTimeout was scheduled before the promise. The synchronous code runs to completion (1, 4). The current task ends. The runtime then drains microtasks (3). Only after the microtask queue is empty does it pull the next macrotask (2). A microtask that finishes "after" a 0 ms timer always runs first.</p>
+
+      <div class="callout">
+        <div class="callout-label">Why two queues?</div>
+        Microtasks exist so that promise chains and observers can complete an entire reaction <em>before</em> the runtime returns control to the outside world (next timer, next event, next render). It guarantees that by the time a paint happens, every <code>.then()</code> set up by the most recent code has resolved. The cost: a runaway microtask chain (<code>resolve().then(() =&gt; resolve().then(...))</code>) can starve macrotasks indefinitely — the loop never gets to step 3 (render) because step 2 (drain microtasks) never finishes.
+      </div>
+
+      <h2 id="timeout"><span class="num">05</span>Why <code>setTimeout(0)</code> isn't 0</h2>
+
+      <p><code>setTimeout(fn, 0)</code> doesn't run <code>fn</code> immediately. It schedules <code>fn</code> as a macrotask and adds it to the queue. <code>fn</code> can only run after (a) the current task finishes, (b) all microtasks drain, and (c) the macrotask queue ahead of it has cleared. Even on a quiet runtime, browsers historically clamp the minimum to ~4 ms (a HTML spec rule) when timers are nested deeper than five levels, so <code>setTimeout(fn, 0)</code> often actually fires after 4 ms or more.</p>
+
+      <p>The mental model that makes this make sense: <strong>timers are about "no sooner than," not "exactly at."</strong> The <code>0</code> argument means "the runtime is allowed to run this as soon as it can find a slot." It does not promise immediacy. If you want to defer something to "as soon as the current code is done but before the next render," <code>queueMicrotask(fn)</code> is the tool — that's a microtask, not a macrotask, and it runs in the same tick before the loop hands control back to the browser.</p>
+
+      <h2 id="blocking"><span class="num">06</span>Never block the loop</h2>
+
+      <p>The single most important rule of writing JavaScript is also the simplest: <strong>do not run synchronous code that takes a long time</strong>. The loop is single-threaded; everything is paused while your code runs. Five seconds of synchronous work is five seconds where the user can't click, no animation frames render, no XHR responses are processed, no promises resolve. The page is dead until your function returns.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — A blocked loop is a dead loop</div>
+        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="160" x2="600" y2="160" stroke="var(--rule)" stroke-width="1" />
+          <text x="320" y="200" text-anchor="middle" class="svg-text-muted">time →</text>
+
+          <rect x="40" y="120" width="60" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="70" y="145" text-anchor="middle" class="svg-text-bold" fill="white">tick</text>
+
+          <rect x="100" y="120" width="60" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="130" y="145" text-anchor="middle" class="svg-text-bold" fill="white">tick</text>
+
+          <rect x="160" y="100" width="280" height="60" fill="var(--accent)" opacity="0.95" />
+          <text x="300" y="135" text-anchor="middle" class="svg-text-bold" fill="white">SYNCHRONOUS WORK · 5 seconds</text>
+
+          <rect x="440" y="120" width="60" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="470" y="145" text-anchor="middle" class="svg-text-bold" fill="white">tick</text>
+
+          <rect x="500" y="120" width="60" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="530" y="145" text-anchor="middle" class="svg-text-bold" fill="white">tick</text>
+
+          <text x="300" y="80" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">no clicks · no renders · no timers · no I/O callbacks</text>
+          <path d="M 300 84 L 300 100" stroke="var(--accent)" stroke-width="1.5" />
+        </svg>
+        <p class="figure-caption">During a long synchronous task, the loop can't tick. Every queued macrotask waits, microtasks pile up, and the page is frozen from the user's perspective. Even one slow JSON.parse on a big payload, or one unbounded loop in a render function, is enough to drop frames.</p>
+      </div>
+
+      <h3>What "blocking" looks like in practice</h3>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li>Parsing a 50 MB JSON document with <code>JSON.parse</code> on the main thread.</li>
+        <li>A tight loop computing a hash over a large file synchronously.</li>
+        <li>A regex with catastrophic backtracking on user input.</li>
+        <li>Calling a synchronous third-party library that does heavy work without yielding.</li>
+      </ul>
+
+      <h3>The fixes</h3>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Break work into chunks</h4>
+          <p>Process the first 1,000 items synchronously, then <code>queueMicrotask</code> or <code>setTimeout(_, 0)</code> the rest. Each chunk gives the loop a chance to tick — handle UI events, render frames, fire timers. Total time is similar; responsiveness is dramatically better.</p>
+        </div>
+        <div class="card">
+          <h4>Move it off-thread</h4>
+          <p>For genuinely heavy CPU work, use a <a class="glink" href="../glossary.html#web-worker">Web Worker</a> (browser) or <code>worker_threads</code> (Node). That's a separate OS thread with its own event loop and its own JS context — true parallelism. Communication is by message-passing (no shared state), so the model stays clean.</p>
+        </div>
+      </div>
+
+      <p class="pullquote">A frozen page is almost always one synchronous loop that didn't yield. Fix it by yielding, or by moving the loop to another thread.</p>
+
+      <h2 id="takeaway"><span class="num">07</span>The one-line takeaway</h2>
+
+      <p>The event loop is JavaScript's whole answer to concurrency. One thread, one stack, two queues, and a rule: drain microtasks between every macrotask, and never let any task run for too long. When you keep that rule, a single core handles thousands of in-flight things gracefully. When you break it, the page goes dark.</p>
+
+      <p>This is the canonical example of <a href="concurrency-vs-parallelism.html">concurrency without parallelism</a> — many things in flight, exactly one running at a time. Languages with similar models (Python's <code>asyncio</code>, Erlang's actor system on a single scheduler, async Rust on a single-threaded executor) all have a version of the same loop. The vocabulary differs; the constraints don't.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#microtask">microtask</a><a href="../glossary.html#macrotask">macrotask</a><a href="../glossary.html#libuv">libuv</a><a href="../glossary.html#web-worker">Web Worker</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="concurrency-vs-parallelism.html">
+              <span class="related-arrow">→</span>
+              <span>Concurrency vs Parallelism</span>
+              <span class="related-summary">— the broader idea this loop is the canonical example of.</span>
+            </a>
+          </li>
+          <li>
+            <a href="process-vs-thread.html">
+              <span class="related-arrow">→</span>
+              <span>Process vs Thread</span>
+              <span class="related-summary">— what the "one thread" actually is.</span>
+            </a>
+          </li>
+          <li>
+            <a href="context-switching.html">
+              <span class="related-arrow">→</span>
+              <span>Context Switching</span>
+              <span class="related-summary">— what the OS does when you bring more threads into the picture.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Execution model. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

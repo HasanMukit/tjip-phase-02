@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Back-of-the-Envelope Estimation — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Craft</a></div>
+        <h1>Back-of-the-Envelope <em>estimation</em></h1>
+        <p class="deck">Five minutes, a few memorized constants, and the discipline to round hard — that's all it takes to size a system before writing a line of code.</p>
+        <div class="meta">
+          <span class="class-pill">Class 03</span>
+          <span>Theme · Craft</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#what">What "back-of-the-envelope" actually means</a></li>
+          <li><a href="#numbers">The numbers worth memorizing</a></li>
+          <li><a href="#method">The four-step method</a></li>
+          <li><a href="#example">Worked example #1 — a Twitter-scale timeline</a></li>
+          <li><a href="#youtube">Worked example #2 — YouTube space and cache</a></li>
+          <li><a href="#traps">Where the math lies to you</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">Before any system design conversation gets to "which database?" or "Kafka or NATS?", there's a much smaller question hiding underneath it: <em>how big is this thing, actually?</em> A few simple multiplications turn a vague idea ("a feed app") into concrete numbers — 30 K writes per second, 9 TB per year, 2 GB of cache. Once those numbers exist, half the design choices make themselves. This page is about how to get them in five minutes with a pen.</p>
+
+      <p>Back-of-the-envelope estimation is the bridge between <a href="../performance/latency.html">latency</a> and <a href="../performance/throughput.html">throughput</a> as vocabulary and capacity planning as a craft. It's also the single most cited skill in system-design interviews — not because the exact answer matters, but because the <em>habit</em> of reaching for it does.</p>
+
+      <h2 id="what"><span class="num">01</span>What "back-of-the-envelope" actually means</h2>
+
+      <p>It's a quick, paper-only sizing of the system. No benchmarks, no spreadsheets, no profiling — just rough multiplication using a handful of memorized constants. The goal isn't precision. The goal is to land within roughly 10× of reality before you've made any commitments.</p>
+
+      <p>That sounds loose, but a 10× answer is enormously more useful than no answer. If a back-of-the-envelope says "5 GB/day of storage," you know SQLite on a single VM is fine. If it says "5 TB/day," you know you're shopping for distributed storage. The two regimes have nothing in common — and you knew which one you were in before opening a single doc page.</p>
+
+      <div class="callout">
+        <div class="callout-label">The point isn't the answer, it's the <em>regime</em></div>
+        Back-of-the-envelope estimation rarely tells you which technology to pick. It tells you which class of technologies is even on the table. Single-machine vs. multi-machine. In-memory vs. on-disk. Sync vs. async. Once the regime is fixed, the rest of the design has a much smaller search space.
+      </div>
+
+      <h2 id="numbers"><span class="num">02</span>The numbers worth memorizing</h2>
+
+      <p>Three short tables. If you internalize these, almost every BoE calculation collapses into two or three multiplications.</p>
+
+      <h3>Powers of 2 (storage and counts)</h3>
+
+      <p>Engineers approximate 2<sup>10</sup> ≈ 10<sup>3</sup> so the math stays in base 10. The error is ~2% per multiplication, which is well below the 10× tolerance the whole exercise lives within.</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Power</th>
+            <th>Exact</th>
+            <th>Approx</th>
+            <th>What it names</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono">2<sup>10</sup></td><td class="mono">1,024</td><td class="mono">1 K (10<sup>3</sup>)</td><td>a kilobyte; thousand</td></tr>
+          <tr><td class="mono">2<sup>20</sup></td><td class="mono">1,048,576</td><td class="mono">1 M (10<sup>6</sup>)</td><td>a megabyte; million</td></tr>
+          <tr><td class="mono">2<sup>30</sup></td><td class="mono">~1.07 × 10<sup>9</sup></td><td class="mono">1 B (10<sup>9</sup>)</td><td>a gigabyte; billion</td></tr>
+          <tr><td class="mono">2<sup>32</sup></td><td class="mono">~4.29 × 10<sup>9</sup></td><td class="mono">~4 B</td><td style="color: var(--accent);">unsigned 32-bit max — IDs overflow here</td></tr>
+          <tr><td class="mono">2<sup>40</sup></td><td class="mono">~1.10 × 10<sup>12</sup></td><td class="mono">1 T (10<sup>12</sup>)</td><td>a terabyte; trillion</td></tr>
+          <tr><td class="mono">2<sup>50</sup></td><td class="mono">~1.13 × 10<sup>15</sup></td><td class="mono">1 P (10<sup>15</sup>)</td><td>a petabyte; quadrillion</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Time (the seconds-in-a-day trick)</h3>
+
+      <p>Almost every estimate routes through one constant: there are roughly <strong>10<sup>5</sup> seconds in a day</strong>. Memorize that and per-day numbers convert to per-second by lopping off five zeros.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Per-day → per-second</h4>
+          <p>1 day = 86,400 s ≈ <strong>10<sup>5</sup> s</strong>. So 1 M events/day ≈ 10 events/s. 100 M events/day ≈ 1 K events/s. 10 B events/day ≈ 100 K events/s. The conversion is "÷ 10<sup>5</sup>" and you can do it in your head.</p>
+        </div>
+        <div class="card">
+          <h4>Larger windows</h4>
+          <p>1 month ≈ 2.5 × 10<sup>6</sup> s. 1 year ≈ 3 × 10<sup>7</sup> s (more precisely 31.5 M). So "events per year" is "events per day × 365" or "per second × 30 M" — pick whichever multiplication is easier.</p>
+        </div>
+      </div>
+
+      <h3>Typical sizes (what one record actually weighs)</h3>
+
+      <p>You can't estimate storage without a guess for the size of one row. These ballparks cover most cases:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Object</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>ASCII char / boolean byte</td><td class="mono">1 B</td></tr>
+          <tr><td>int32, IPv4 address</td><td class="mono">4 B</td></tr>
+          <tr><td>int64, timestamp, double</td><td class="mono">8 B</td></tr>
+          <tr><td>UUID, IPv6 address</td><td class="mono">16 B</td></tr>
+          <tr><td>Tweet / short message text</td><td class="mono">~300 B</td></tr>
+          <tr><td>A "row" with several fields + indexes</td><td class="mono">~1 KB</td></tr>
+          <tr><td>Web page (HTML)</td><td class="mono">~100 KB</td></tr>
+          <tr><td>Photo (compressed JPEG)</td><td class="mono">~200 KB</td></tr>
+          <tr><td>1 minute of HD video</td><td class="mono">~50 MB</td></tr>
+        </tbody>
+      </table>
+
+      <p>For latency constants — RAM, SSD, network round-trips — the canonical reference is the <a href="../performance/latency.html">1,000× hierarchy</a>. Memorize those numbers separately; they're the fourth table.</p>
+
+      <h2 id="method"><span class="num">03</span>The four-step method</h2>
+
+      <p>Almost every BoE problem follows the same shape. Run through these four steps in order and the answer falls out.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The funnel from users to required capacity</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="60" y="40" width="520" height="44" rx="4" fill="var(--s1)" opacity="0.85" />
+          <text x="320" y="68" text-anchor="middle" class="svg-text-bold" fill="white">1. State assumptions — DAU, actions/user, payload size</text>
+
+          <path d="M 320 90 L 320 100" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#bo1)" />
+
+          <rect x="100" y="110" width="440" height="44" rx="4" fill="var(--s2)" opacity="0.85" />
+          <text x="320" y="138" text-anchor="middle" class="svg-text-bold" fill="white">2. Daily totals — DAU × actions per user</text>
+
+          <path d="M 320 160 L 320 170" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#bo1)" />
+
+          <rect x="140" y="180" width="360" height="44" rx="4" fill="var(--s3)" opacity="0.85" />
+          <text x="320" y="208" text-anchor="middle" class="svg-text-bold" fill="white">3. Per-second — divide by 10⁵</text>
+
+          <path d="M 320 230 L 320 240" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#bo1)" />
+
+          <rect x="180" y="250" width="280" height="44" rx="4" fill="var(--accent)" opacity="0.95" />
+          <text x="320" y="278" text-anchor="middle" class="svg-text-bold" fill="white">4. Apply peak factor (×3 typical)</text>
+
+          <defs>
+            <marker id="bo1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)" />
+            </marker>
+          </defs>
+        </svg>
+        <p class="figure-caption">Each step narrows the funnel. Storage and bandwidth come from the same four numbers — multiply by record size for storage, by payload size for bandwidth, by retention years for total disk.</p>
+      </div>
+
+      <h3>Step 1 — State assumptions out loud</h3>
+
+      <p>Write down the inputs before you do any math. Daily Active Users (DAU). Actions per user per day. Average payload size. Read-to-write ratio. Retention period. These are guesses — but explicit guesses you can defend, not vibes. The discipline matters because every later number traces back to one of these. If a reviewer disagrees with your conclusion, the disagreement is almost always about an assumption, not the arithmetic.</p>
+
+      <h3>Step 2 — Compute daily totals</h3>
+
+      <p>Multiply DAU by actions per user. That's daily writes. For reads, multiply by the read-to-write ratio (typically 10:1 for content systems, 100:1 for social feeds, 1000:1 for read-heavy news sites).</p>
+
+      <h3>Step 3 — Convert to per-second</h3>
+
+      <p>Divide by 10<sup>5</sup>. That's it. 100 M actions/day ÷ 10<sup>5</sup> = 1 K actions/sec. The mental shortcut: lop off five zeros from the daily count.</p>
+
+      <h3>Step 4 — Apply the peak multiplier</h3>
+
+      <p>Real systems don't see traffic uniformly across the day. Use a <a class="glink" href="../glossary.html#peak-factor">peak factor</a> — typically <strong>×3</strong> for general consumer apps, <strong>×5</strong> for clearly diurnal workloads (commute apps, food delivery), <strong>×2</strong> for global services that average across time zones. The peak number is what you size capacity against; the average is what you bill against.</p>
+
+      <p>For storage and bandwidth, two more multiplications close out the calculation:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.7; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Storage per day</strong> = daily writes × bytes per record. Multiply by retention years × 365 for total. Multiply by replication factor (typically 3) for what you actually provision.</li>
+        <li><strong>Bandwidth</strong> = peak QPS × payload size. Outbound (to clients) is usually larger than inbound — favor the bigger one.</li>
+        <li><strong>Cache size</strong> = the 80/20 rule. 20% of content drives 80% of reads. Size the cache to hold that 20% in RAM.</li>
+      </ul>
+
+      <h2 id="example"><span class="num">04</span>Worked example #1 — a Twitter-scale timeline</h2>
+
+      <p>Designing a service where users post short messages and read a feed of who they follow. Let's size it.</p>
+
+      <h3>Assumptions</h3>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.7; color: var(--muted); margin: 0 0 24px 20px;">
+        <li>DAU = 200 M</li>
+        <li>Each user posts 2 messages per day (avg) and reads 100 messages per day</li>
+        <li>Average message: 280 chars text + ~300 B metadata (author, timestamp, IDs) = <strong>~600 B</strong></li>
+        <li>30% of messages include a photo at 200 KB</li>
+        <li>Retention: 5 years; replication factor: 3</li>
+        <li>Peak-to-average factor: 3×</li>
+      </ul>
+
+      <h3>Writes per second</h3>
+
+      <p>200 M users × 2 posts/day = <strong>400 M posts/day</strong>. ÷ 10<sup>5</sup> = <strong>4 K writes/s</strong> average. Peak: <strong>~12 K writes/s</strong>.</p>
+
+      <h3>Reads per second</h3>
+
+      <p>200 M users × 100 reads/day = <strong>20 B reads/day</strong>. ÷ 10<sup>5</sup> = <strong>200 K reads/s</strong> average. Peak: <strong>~600 K reads/s</strong>. Notice the read load is 50× the write load — this number alone tells you to design read-side caching as the primary lever.</p>
+
+      <h3>Storage per day</h3>
+
+      <p>Text: 400 M × 600 B = <strong>~240 GB/day</strong> of message data. Photos: 30% × 400 M × 200 KB = <strong>~24 TB/day</strong> of media. The photo storage dominates by 100×.</p>
+
+      <h3>Storage over 5 years (with replication)</h3>
+
+      <p>Text: 240 GB/day × 365 × 5 × 3 ≈ <strong>~1.3 PB</strong>. Photos: 24 TB/day × 365 × 5 × 3 ≈ <strong>~130 PB</strong>. The text fits comfortably on a single distributed DB cluster; photos go in object storage (S3-shaped) because no relational store wants 130 PB.</p>
+
+      <h3>Outbound bandwidth at peak</h3>
+
+      <p>600 K reads/s × ~600 B per message × ~20 messages/feed-fetch ≈ <strong>~7 GB/s</strong> of outbound text. Plus photos when included. This is why CDNs exist — serving 7+ GB/s out of your origin would cost a fortune. Push it to edge caches.</p>
+
+      <div class="callout">
+        <div class="callout-label">What the numbers told us</div>
+        Without picking a single technology, the BoE already constrained the design: <strong>read-heavy</strong> (cache aggressively), <strong>media-dominated storage</strong> (object store, not RDBMS), <strong>CDN-mandatory outbound</strong> (origin can't carry it), and <strong>shardable hot set</strong> (no single-node cache works at this scale). Five minutes of multiplication eliminated half the architectural search space.
+      </div>
+
+      <h2 id="youtube"><span class="num">05</span>Worked example #2 — YouTube space and cache</h2>
+
+      <p>Twitter is text-dominant; YouTube is the opposite — video bytes dominate everything else by orders of magnitude, and the interesting BoE questions are <em>how much disk to provision</em> and <em>how to size the cache so most playbacks never touch origin</em>. The math reveals why YouTube is a CDN problem more than a database problem.</p>
+
+      <h3>Assumptions</h3>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.7; color: var(--muted); margin: 0 0 24px 20px;">
+        <li>Upload rate: <strong>500 hours of video per minute</strong> (the well-known stat)</li>
+        <li>Average bitrate after encoding (1080p reference): ~50 MB per minute of video</li>
+        <li>YouTube stores <strong>5 quality variants</strong> per video → ~5× storage multiplier</li>
+        <li>Replication factor: 3</li>
+        <li>Concurrent peak viewers: ~100 M; average stream bitrate: 2 Mbps</li>
+        <li>Pareto: <strong>20% of videos drive 80% of views</strong></li>
+      </ul>
+
+      <h3>Storage from uploads</h3>
+
+      <p>500 hours/min × 60 min/hour = <strong>30 K minutes of video uploaded per minute</strong>. At 50 MB per minute (single quality): <strong>1.5 TB/min uploaded</strong>. Per day: 1.5 TB × 60 × 24 ≈ <strong>~2 PB/day raw</strong>.</p>
+
+      <p>Multiply by 5 quality variants: <strong>~10 PB/day</strong> of stored encoded content. Multiply by replication ×3: <strong>~30 PB/day</strong> on disk. Annualized: <strong>~10 EB/year</strong> of provisioned storage. There is no single-cluster database that holds 10 EB; YouTube's video bytes live in a dedicated blob store optimized for sequential, write-once-read-many access — not in any general-purpose DB.</p>
+
+      <h3>Cache sizing — the 80/20 insight</h3>
+
+      <p>Most videos are watched almost never; a small fraction are watched constantly. The cache only needs to hold <em>the 20% that drives 80% of plays</em> — so the cache size is governed by the popular library, not the total library.</p>
+
+      <p>Take the recent window: 30 days × 10 PB/day = <strong>~300 PB of recent multi-quality content</strong>. The hot 20% is <strong>~60 PB</strong>. That's still vastly too large for a centralized cache, so it's distributed across edge points-of-presence (PoPs):</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.7; color: var(--muted); margin: 0 0 24px 20px;">
+        <li>~1,000 PoPs globally → <strong>~60 TB hot content per PoP</strong>. That fits comfortably on flash/NVMe in each edge node.</li>
+        <li>The "very hot" 1% (viral videos, current trending) → ~3 PB total → <strong>~3 TB per PoP</strong> in RAM hot tier.</li>
+      </ul>
+
+      <p>This is the heart of the answer: <em>the hot set fits in edge flash</em>. Origin storage holds ~10 EB; edge caches hold ~60 PB total across 1,000 PoPs; viewer requests almost never round-trip to origin. The numbers prove that the architecture <strong>has</strong> to be edge-cache-dominated — there's no other way it works at this scale.</p>
+
+      <h3>Outbound bandwidth (sanity check)</h3>
+
+      <p>100 M concurrent viewers × 2 Mbps = <strong>~200 Tbps</strong> peak outbound. That confirms the same conclusion from a different angle: no origin can serve 200 Tbps; the edge tier carries ~95%+ of bytes and origin handles only cache misses and uploads.</p>
+
+      <div class="callout">
+        <div class="callout-label">What the numbers told us</div>
+        Without naming a single product, the BoE forced four conclusions: <strong>blob storage, not RDBMS</strong>; <strong>multi-resolution transcoding pipeline</strong>; <strong>edge-CDN-dominant serving</strong>; <strong>tiered cache</strong> with RAM for the very hot 1% and flash for the warm 20%. Pareto was the single most useful constant — without it, "we need to cache everything" gives a wrong-by-100× answer.
+      </div>
+
+      <h2 id="traps"><span class="num">06</span>Where the math lies to you</h2>
+
+      <p>Every common BoE mistake comes from one of five places. Watch for them.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Confusing peak with average</h4>
+          <p>Average QPS is a billing number; peak QPS is a capacity number. Capacity-plan on peak — sometimes 5–10× the average — or your launch will get embarrassed by the first lunchtime spike.</p>
+        </div>
+        <div class="card">
+          <h4>Forgetting replication</h4>
+          <p>"Storage per year" is raw bytes; what you actually provision is raw × replication factor (usually 3) × overhead (indexes, WAL, free space — another 1.5–2×). The disk you order is 4–6× the napkin number.</p>
+        </div>
+        <div class="card">
+          <h4>Using KB/MB for network</h4>
+          <p>Storage is bytes; bandwidth is usually bits. A "1 Gbps" link is 125 MB/s, not 1 GB/s — divide by 8. Mixing them up is an 8× error and silently undersized links.</p>
+        </div>
+        <div class="card">
+          <h4>Ignoring the read/write ratio</h4>
+          <p>Most systems are 10–1000× more reads than writes. Sizing to write QPS without scaling reads accordingly produces a system that runs fine for the first user and falls over at the second.</p>
+        </div>
+        <div class="card">
+          <h4>Missing the hidden multiplier</h4>
+          <p>One user "posting a photo" can fan out to: write the photo, write a row, update an inverted index, update each follower's feed cache, write an audit log, update analytics. One front-door event becomes a dozen back-end writes. Estimate the fan-out before you estimate capacity.</p>
+        </div>
+        <div class="card">
+          <h4>Treating the answer as precise</h4>
+          <p>BoE numbers are within ~10×, not within 10%. Don't argue about whether a system needs 4.7 TB or 5.2 TB — argue about whether it's "a few terabytes" or "a few hundred." Wrong-by-2× is fine; wrong-by-100× is the bug to catch.</p>
+        </div>
+      </div>
+
+      <p>And one cross-check that costs nothing: <a href="../performance/latency-throughput.html">Little's Law</a>. If your BoE says peak QPS = 600 K and average per-request time = 50 ms, then average concurrency = 30 K — meaning you need that many in-flight workers, connections, or cores across the fleet. If a downstream sub-system can't accept 30 K concurrent calls, the BoE just told you about a bottleneck before you built it.</p>
+
+      <h2 id="takeaway"><span class="num">07</span>The one-line takeaway</h2>
+
+      <p class="pullquote">A few constants and four multiplications turn "an app for X" into the regime of system you're actually building. Do it before you design — not during the post-mortem.</p>
+
+      <p>The habit worth forming: every time someone proposes a system, before talking about technologies, do the BoE in your head. <em>How many users? How many actions each? What does that come to per second at peak? How much storage does a year of that take?</em> Within thirty seconds you'll know whether the conversation should be about Postgres or Cassandra, single-region or multi-region, sync or async. The numbers won't be precise — but the regime they put you in will be right.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#peak-factor">peak factor</a><a href="../glossary.html#littles-law">Little's Law</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="interview-framework.html">
+              <span class="related-arrow">→</span>
+              <span>The 6-Step Interview Framework</span>
+              <span class="related-summary">— BoE is Step 2 of that framework.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../performance/latency.html">
+              <span class="related-arrow">→</span>
+              <span>Latency</span>
+              <span class="related-summary">— the per-operation costs you multiply against.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../performance/latency-throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Latency &amp; Throughput</span>
+              <span class="related-summary">— Little's Law as the BoE cross-check.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 03 · Craft. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

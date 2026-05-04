@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Latency — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Performance</a></div>
+        <h1><em>Latency</em></h1>
+        <p class="deck">The time one request takes from start to finish — and why the hierarchy of how long different operations take stretches across nine orders of magnitude.</p>
+        <div class="meta">
+          <span class="class-pill">Class 03</span>
+          <span>Theme · Performance</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#what">What latency is</a></li>
+          <li><a href="#anatomy">Anatomy of one request</a></li>
+          <li><a href="#hierarchy">The 1,000× hierarchy</a></li>
+          <li><a href="#scale">Multiply everything by a billion</a></li>
+          <li><a href="#choices">Turning numbers into technology choices</a></li>
+          <li><a href="#bandwidth">Access latency vs bandwidth</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">Latency is the stopwatch. You press start when a request leaves, stop when the response comes back, and read the number. That's it — one number, per request. Most of what it measures isn't computation; it's waiting. And the waiting lives in a hierarchy of places whose costs differ by factors of a million.</p>
+
+      <p>This page is about that single number: what it actually contains, the well-known hierarchy of how long different operations take, and a subtle trap (access latency vs bandwidth) that hides inside the canonical list.</p>
+
+      <h2 id="what"><span class="num">01</span>What latency is</h2>
+
+      <p>Latency is the duration between <em>starting</em> a request and <em>getting</em> the response. It's a <strong>per-request</strong> measurement, reported in milliseconds, microseconds, or occasionally seconds. One number per request. If you sent 10,000 requests you'd have 10,000 latency samples — and a distribution worth looking at closely (that's a separate topic, covered on the <a href="latency-throughput.html">combined page</a>).</p>
+
+      <p>Latency is not the same as throughput. A service can answer a single request instantly and still be slow at handling many — or vice versa. The two numbers can move independently and often trade off against each other; see the <a href="latency-throughput.html">Latency ⇄ Throughput page</a> for how they interact.</p>
+
+      <h2 id="anatomy"><span class="num">02</span>Anatomy of one request</h2>
+
+      <p>What's inside a single latency number is usually a stack of smaller latencies — each a separate stage the request passes through:</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — Anatomy of one request's latency</div>
+        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+          <line x1="40" y1="180" x2="600" y2="180" stroke="var(--rule)" stroke-width="1" />
+
+          <rect x="40" y="140" width="80" height="40" fill="var(--s1)" opacity="0.85" />
+          <rect x="120" y="140" width="60" height="40" fill="var(--s2)" opacity="0.85" />
+          <rect x="180" y="140" width="180" height="40" fill="var(--s3)" opacity="0.85" />
+          <rect x="360" y="140" width="140" height="40" fill="var(--s4)" opacity="0.85" />
+          <rect x="500" y="140" width="90" height="40" fill="var(--s1)" opacity="0.85" />
+
+          <text x="80" y="165" text-anchor="middle" class="svg-text-bold" fill="white">Network</text>
+          <text x="150" y="165" text-anchor="middle" class="svg-text-bold" fill="white">Queue</text>
+          <text x="270" y="165" text-anchor="middle" class="svg-text-bold" fill="white">Compute</text>
+          <text x="430" y="165" text-anchor="middle" class="svg-text-bold" fill="white">DB I/O</text>
+          <text x="545" y="165" text-anchor="middle" class="svg-text-bold" fill="white">Network</text>
+
+          <text x="80" y="130" text-anchor="middle" class="svg-text-muted">5 ms</text>
+          <text x="150" y="130" text-anchor="middle" class="svg-text-muted">3 ms</text>
+          <text x="270" y="130" text-anchor="middle" class="svg-text-muted">12 ms</text>
+          <text x="430" y="130" text-anchor="middle" class="svg-text-muted">9 ms</text>
+          <text x="545" y="130" text-anchor="middle" class="svg-text-muted">5 ms</text>
+
+          <circle cx="40" cy="180" r="4" fill="var(--accent)" />
+          <circle cx="590" cy="180" r="4" fill="var(--accent)" />
+          <text x="40" y="208" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">request sent</text>
+          <text x="590" y="208" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">response received</text>
+
+          <text x="320" y="48" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">Total latency = 34 ms</text>
+          <path d="M 40 70 L 40 60 L 590 60 L 590 70" fill="none" stroke="var(--accent)" stroke-width="1.2" />
+
+          <text x="320" y="230" text-anchor="middle" class="svg-text-muted">time →</text>
+        </svg>
+        <p class="figure-caption">Latency is the end-to-end clock time for one request. Most of it is usually <em>waiting</em> — in queues, on the network, on disk — not actual computation. Optimizing latency means finding out which stage dominates and attacking that one.</p>
+      </div>
+
+      <p>Latency is dominated by whoever is slowest in the chain. Shaving 2 ms off a 12 ms compute step matters; shaving 2 ms off a 2 ms network hop is usually not worth the effort. Before optimizing, measure — profile the stages and find the fat one.</p>
+
+      <h2 id="hierarchy"><span class="num">03</span>The 1,000× hierarchy</h2>
+
+      <p>Jeff Dean's famous list (still the reference) boils performance down to a short table of numbers every engineer should have memorized. The surprising insight is that the hierarchy is <em>roughly logarithmic</em> — each tier is about 1,000× slower than the one above it. A cache miss that falls through to disk is a million times slower than a hit.</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Operation</th>
+            <th>Latency</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>CPU</td><td>L1 cache reference</td><td class="mono">~1 ns</td></tr>
+          <tr><td>CPU</td><td>L2 cache reference</td><td class="mono">~3 ns</td></tr>
+          <tr><td>CPU</td><td>Branch mispredict</td><td class="mono">~4 ns</td></tr>
+          <tr><td>CPU</td><td>L3 cache reference</td><td class="mono">~10 ns</td></tr>
+          <tr><td>CPU</td><td>Mutex lock/unlock (uncontended)</td><td class="mono">~20 ns</td></tr>
+          <tr><td>RAM</td><td>Main memory reference (DDR5)</td><td class="mono">~80 ns</td></tr>
+          <tr><td>RAM</td><td>Compress 1 KB (Snappy/Zstd)</td><td class="mono">~1 µs</td></tr>
+          <tr><td>RAM</td><td>Send 1 KB over 10 Gbps</td><td class="mono">~1 µs</td></tr>
+          <tr><td>RAM</td><td>Read 1 MB sequentially from RAM</td><td class="mono">~10 µs</td></tr>
+          <tr><td>SSD</td><td>NVMe random read</td><td class="mono">~30 µs</td></tr>
+          <tr><td>SSD</td><td>Read 1 MB from NVMe</td><td class="mono">~150 µs</td></tr>
+          <tr><td>Net</td><td>Same-DC round-trip (P50)</td><td class="mono">~500 µs</td></tr>
+          <tr><td>HDD</td><td>Read 1 MB from HDD</td><td class="mono">~7 ms</td></tr>
+          <tr><td>HDD</td><td>HDD seek</td><td class="mono">~10 ms</td></tr>
+          <tr><td>WAN</td><td>CA ↔ Netherlands round-trip</td><td class="mono">~150 ms</td></tr>
+        </tbody>
+      </table>
+
+      <p>Originally compiled by Jeff Dean (2009); numbers above are refreshed for 2026 hardware (DDR5 memory, NVMe SSDs, 10 Gbps NICs, modern multi-GHz cores). The canonical list still quotes the 2009 values — useful as relative benchmarks but 5–25× too slow for anything bandwidth-bound today.</p>
+
+      <h2 id="scale"><span class="num">04</span>Multiply everything by a billion</h2>
+
+      <p>Raw nanoseconds are hard to feel. A classic trick is to scale every number up by 10<sup>9</sup> — treat one nanosecond as one second — and the hierarchy suddenly becomes human:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>L1 cache hit</strong> (~1 ns) → 1 second (a heartbeat).</li>
+        <li><strong>Main memory reference</strong> (~80 ns) → 80 seconds (a short errand).</li>
+        <li><strong>NVMe SSD random read</strong> (~30 µs) → 8.3 hours (a workday).</li>
+        <li><strong>Same-datacenter round-trip</strong> (~500 µs) → 5.8 days (a vacation).</li>
+        <li><strong>HDD seek</strong> (~10 ms) → 16.5 weeks (a university semester).</li>
+        <li><strong>Cross-continent packet</strong> (~150 ms) → 4.8 years (a bachelor's degree).</li>
+      </ul>
+
+      <p>Seen this way, the cost of hitting disk or crossing an ocean isn't just "slower" — it's categorically a different kind of activity. This is why cache locality, keeping data in memory, and minimizing network hops dominate performance work. Even a single extra cross-region call can cost more than the entire CPU budget of a request.</p>
+
+      <div class="callout">
+        <div class="callout-label">The practical lesson</div>
+        Before profiling, guess. Which tier does this operation live on? If a request touches disk or a remote service, that's almost certainly where the time is going — not in your carefully optimized loop. Optimize the slowest tier first; anything else is micro-optimization on a rounding error.
+      </div>
+
+      <h2 id="choices"><span class="num">05</span>Turning numbers into technology choices</h2>
+
+      <p>The hierarchy is also a decision tree for picking the right tool. Working backward from your latency budget:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Need &lt; 1 ms</h4>
+          <p>Data must be in memory. In-memory stores (Redis, Memcached), local caches, or replicated state. Anything involving disk or network will blow the budget by itself.</p>
+        </div>
+        <div class="card">
+          <h4>Need &lt; 10 ms</h4>
+          <p>Local SSD is fine; same-datacenter network calls are fine. Typical zone for a single DB query plus a little business logic. A single cross-region hop already eats your budget.</p>
+        </div>
+        <div class="card">
+          <h4>Need &lt; 100 ms</h4>
+          <p>Room for a handful of same-region network calls, a DB commit (~1 ms), and some compute. This is the "one page load" budget for most web apps.</p>
+        </div>
+        <div class="card">
+          <h4>Need &lt; 1 s</h4>
+          <p>Cross-region calls are feasible. Complex multi-service flows, external API calls, or heavier queries. Beyond this, users perceive the system as "slow" and you need async/streaming patterns.</p>
+        </div>
+      </div>
+
+      <h2 id="bandwidth"><span class="num">06</span>Access latency vs bandwidth</h2>
+
+      <p>There's a subtle trap hiding in the hierarchy above. Every storage tier has <em>two</em> latency numbers — a "single access" number and a "read 1 MB" number — and people conflate them constantly. They measure different physics, and confusing them leads to the wrong design.</p>
+
+      <h3>Two numbers, two physics</h3>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#access-latency">Access latency</a></h4>
+          <p>How long you wait before getting the <em>first</em> byte. Set by the device's physics — pipeline depth for RAM, flash-controller overhead for SSDs, head seek plus rotational delay for HDDs, round-trip signaling for networks.</p>
+        </div>
+        <div class="card">
+          <h4>Bandwidth</h4>
+          <p>Once data starts flowing, how fast it streams. Set by bus width, number of channels, and raw parallelism. Grows with every hardware generation. RAM: ~100 GB/s. NVMe: ~5–7 GB/s. HDD: ~150 MB/s. 10 Gbps NIC: ~1 GB/s.</p>
+        </div>
+      </div>
+
+      <p>A "read 1 MB" number is mostly a bandwidth measurement. A "random read" or "seek" number is mostly a latency measurement. The ratio between them tells you the shape of the device — whether it's optimized for finding things fast or for moving lots of data once found.</p>
+
+      <h3>What each tier actually does</h3>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Single access</th>
+            <th>Read 1 MB</th>
+            <th>Shape</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>RAM</td>
+            <td class="mono">~80 ns (cache-line miss)</td>
+            <td class="mono">~10 µs (~100 GB/s)</td>
+            <td>125× for 16K× data</td>
+          </tr>
+          <tr>
+            <td>NVMe SSD</td>
+            <td class="mono">~30 µs (random 4 KB)</td>
+            <td class="mono">~150 µs (~5–7 GB/s)</td>
+            <td>5× for 256× data</td>
+          </tr>
+          <tr>
+            <td>HDD</td>
+            <td class="mono">~10 ms (seek + rotation)</td>
+            <td class="mono">~7 ms (~150 MB/s)</td>
+            <td><strong>1 MB is cheaper than the seek</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The HDD row is the oddest — and most instructive. Finding the data costs <em>more</em> than reading it. For spinning disks, the 10 ms seek is pure overhead before a single byte moves; once the head is parked, streaming 1 MB is only ~7 ms on top. This is why databases obsessed over sequential layouts on disk: if you pay the seek once, you might as well slurp a big chunk. One random 8-byte read and one sequential 1 MB read cost roughly the same wall-clock time.</p>
+
+      <h3>The practical lesson</h3>
+
+      <p>"How slow is storage?" is actually two questions. You have to ask both:</p>
+
+      <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>How often am I paying the per-access cost?</strong> Random/scattered access patterns mean latency dominates. A key-value lookup hits this.</li>
+        <li><strong>How much data am I moving per access?</strong> Sequential/bulk workloads mean bandwidth dominates. A full-table scan or a large blob fetch hits this.</li>
+      </ol>
+
+      <p>This is why <code>SELECT * FROM big_table</code> hates random I/O but loves sequential scans. Why a 4 KB key-value lookup on NVMe (~30 µs) is nearly the same cost as a 1 MB blob fetch (~150 µs) — 5× the time for 250× the data. And why every database's storage engine — B-trees, LSMs, columnar formats — is essentially a strategy for turning random reads into sequential ones.</p>
+
+      <div class="callout">
+        <div class="callout-label">The two-number rule</div>
+        Whenever you see a single "storage is X fast" number, ask which one it is. Latency and bandwidth are independent axes, and a design that's fine for one access pattern may be catastrophic for the other. Capacity-plan both.
+      </div>
+
+      <h2 id="takeaway"><span class="num">07</span>The one-line takeaway</h2>
+
+      <p class="pullquote">Latency is the time one request takes. Most of that time is waiting — in a hierarchy of tiers whose costs differ by a factor of a million.</p>
+
+      <p>The hierarchy is the mental model. When you're staring at a slow endpoint, the first question isn't "is my code efficient?" — it's "which tier is this request actually spending its time in?" Almost always, the fat stage is crossing a tier boundary (disk, network, cross-region) and everything else is noise.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#access-latency">access latency</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Throughput</span>
+              <span class="related-summary">— how many requests finish per second; the other half of "fast."</span>
+            </a>
+          </li>
+          <li>
+            <a href="latency-throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Latency &amp; Throughput Together</span>
+              <span class="related-summary">— Little's Law, percentiles, the knee of the curve.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../hardware/memory-hierarchy.html">
+              <span class="related-arrow">→</span>
+              <span>Memory Hierarchy</span>
+              <span class="related-summary">— the physics behind every tier on the latency table.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 03 · Performance. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

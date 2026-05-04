@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Consistent Hashing — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Distribution</a></div>
+        <h1>Consistent <em>hashing</em></h1>
+        <p class="deck">How distributed databases decide where your data lives — and why adding a server doesn't break everything.</p>
+        <div class="meta">
+          <span class="class-pill">Class 02</span>
+          <span>Theme · Distribution</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#problem">The problem with simple hashing</a></li>
+          <li><a href="#ring">The hash ring</a></li>
+          <li><a href="#magic">Adding a server</a></li>
+          <li><a href="#vnodes">Virtual nodes, explained</a></li>
+          <li><a href="#database">Where the data actually lives</a></li>
+          <li><a href="#replication">Replication and failure</a></li>
+          <li><a href="#crash">When a server dies</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">Imagine a library with four shelves. You organize books by a simple rule: take each book's ID, divide by four, and the remainder tells you which shelf. Clean, simple, works perfectly — until you buy a fifth shelf. Now the rule becomes "divide by five," and suddenly almost every book needs to move.</p>
+
+      <p>This is exactly what happens in distributed databases. Data is split across servers, and the naive way to decide where a record lives is <code>hash(key) mod N</code>, where N is the number of servers. Add one server and nearly all your data has to migrate. Lose one, same story. Millions of records shuffle around, caches go cold, users wait.</p>
+
+      <p>Consistent hashing is a beautifully simple fix that has quietly powered most of the internet's data infrastructure since the early 2000s — Amazon's DynamoDB, Apache Cassandra, Discord's message routing, and every major CDN.</p>
+
+      <h2 id="problem"><span class="num">01</span>The problem with simple hashing</h2>
+
+      <p>With N servers and the <code>hash(key) mod N</code> approach, changing N changes the answer for nearly every key. Go from 4 servers to 5 and roughly 80% of your data relocates. That's unacceptable at scale.</p>
+
+      <p>The goal of consistent hashing is simple: <strong>when servers come and go, only a small fraction of data should move.</strong> Ideally, just the slice that actually changed owners.</p>
+
+      <h2 id="ring"><span class="num">02</span>The hash ring</h2>
+
+      <p>Picture a giant clock face — but instead of 12 hours, it has billions of tiny positions around the edge. This is the <a class="glink" href="../glossary.html#hash-ring">hash ring</a>.</p>
+
+      <p>Each server gets placed on the ring based on a hash of its name. Each piece of data also gets placed on the ring based on a hash of its key. To find which server owns a given piece of data, you start at the data's position and walk clockwise until you bump into a server. That's the owner.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The basic ring</div>
+        <svg viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="280" cy="210" r="150" class="ring-line" />
+          <path d="M 280 60 A 160 160 0 0 1 380 100" fill="none" stroke="var(--muted)" stroke-width="0.8" opacity="0.5" />
+          <polygon points="378,96 386,102 378,108" fill="var(--muted)" opacity="0.5" />
+          <text x="345" y="82" class="svg-text-muted">clockwise</text>
+
+          <circle cx="280" cy="60" r="20" fill="var(--s1)" />
+          <text x="280" y="65" text-anchor="middle" class="svg-text-bold" fill="white">A</text>
+
+          <circle cx="410" cy="285" r="20" fill="var(--s2)" />
+          <text x="410" y="290" text-anchor="middle" class="svg-text-bold" fill="white">B</text>
+
+          <circle cx="150" cy="285" r="20" fill="var(--s3)" />
+          <text x="150" y="290" text-anchor="middle" class="svg-text-bold" fill="white">C</text>
+
+          <circle cx="205" cy="82" r="5" fill="var(--s1)" />
+          <text x="193" y="72" text-anchor="end" class="svg-text">key1</text>
+
+          <circle cx="250" cy="63" r="5" fill="var(--s1)" />
+          <text x="242" y="50" text-anchor="end" class="svg-text">key2</text>
+
+          <circle cx="380" cy="140" r="5" fill="var(--s2)" />
+          <text x="395" y="138" class="svg-text">key3</text>
+
+          <circle cx="420" cy="222" r="5" fill="var(--s2)" />
+          <text x="435" y="226" class="svg-text">key4</text>
+
+          <circle cx="280" cy="360" r="5" fill="var(--s3)" />
+          <text x="280" y="382" text-anchor="middle" class="svg-text">key5</text>
+
+          <g transform="translate(500, 140)">
+            <text x="0" y="0" class="svg-text-bold">Owners</text>
+            <circle cx="6" cy="22" r="5" fill="var(--s1)" />
+            <text x="18" y="26" class="svg-text">key1, key2 → A</text>
+            <circle cx="6" cy="46" r="5" fill="var(--s2)" />
+            <text x="18" y="50" class="svg-text">key3, key4 → B</text>
+            <circle cx="6" cy="70" r="5" fill="var(--s3)" />
+            <text x="18" y="74" class="svg-text">key5 → C</text>
+          </g>
+        </svg>
+        <p class="figure-caption">Three servers (A, B, C) and five keys placed around the ring. Each key walks clockwise to find its owner. Key1 and key2 belong to server A; key3 and key4 belong to B; key5 belongs to C.</p>
+      </div>
+
+      <p>That's the entire routing logic. Simple. But the magic shows up when the cluster changes.</p>
+
+      <h2 id="magic"><span class="num">03</span>Adding a server</h2>
+
+      <p>Say server A is getting overloaded. You add a new server, <strong>D</strong>, between A and B on the ring.</p>
+
+      <p>What moves? Only the keys that sit in the arc between A and D. Those keys used to walk clockwise past A to reach B, but now D is closer and catches them first. Every other key on the ring is unaffected — their clockwise walks still end at the same server they always did.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — The zone of change</div>
+        <svg viewBox="0 0 640 420" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="280" cy="210" r="150" class="ring-line" />
+          <path d="M 280 60 A 150 150 0 0 1 410 135" fill="none" stroke="var(--accent)" stroke-width="8" opacity="0.25" stroke-linecap="round" />
+
+          <circle cx="280" cy="60" r="20" fill="var(--s1)" />
+          <text x="280" y="65" text-anchor="middle" class="svg-text-bold" fill="white">A</text>
+
+          <circle cx="410" cy="135" r="22" fill="var(--accent)" stroke="var(--accent)" stroke-width="3" />
+          <text x="410" y="140" text-anchor="middle" class="svg-text-bold" fill="white">D</text>
+          <text x="446" y="115" class="svg-text-bold" fill="var(--accent)">NEW</text>
+
+          <circle cx="410" cy="285" r="20" fill="var(--s2)" />
+          <text x="410" y="290" text-anchor="middle" class="svg-text-bold" fill="white">B</text>
+
+          <circle cx="150" cy="285" r="20" fill="var(--s3)" />
+          <text x="150" y="290" text-anchor="middle" class="svg-text-bold" fill="white">C</text>
+
+          <circle cx="205" cy="82" r="5" fill="var(--s1)" />
+          <text x="193" y="72" text-anchor="end" class="svg-text">key1</text>
+
+          <circle cx="250" cy="63" r="5" fill="var(--s1)" />
+          <text x="242" y="50" text-anchor="end" class="svg-text">key2</text>
+
+          <circle cx="380" cy="140" r="6" fill="var(--accent)" />
+          <text x="370" y="172" class="svg-text-bold" fill="var(--accent)">key3 moved</text>
+
+          <circle cx="420" cy="222" r="5" fill="var(--s2)" />
+          <text x="435" y="226" class="svg-text">key4</text>
+
+          <circle cx="280" cy="360" r="5" fill="var(--s3)" />
+          <text x="280" y="382" text-anchor="middle" class="svg-text">key5</text>
+
+          <g transform="translate(500, 140)">
+            <text x="0" y="0" class="svg-text-bold">After adding D</text>
+            <circle cx="6" cy="22" r="5" fill="var(--s1)" />
+            <text x="18" y="26" class="svg-text">key1, key2 → A</text>
+            <circle cx="6" cy="46" r="5" fill="var(--accent)" />
+            <text x="18" y="50" class="svg-text">key3 → D</text>
+            <circle cx="6" cy="70" r="5" fill="var(--s2)" />
+            <text x="18" y="74" class="svg-text">key4 → B</text>
+            <circle cx="6" cy="94" r="5" fill="var(--s3)" />
+            <text x="18" y="98" class="svg-text">key5 → C</text>
+          </g>
+        </svg>
+        <p class="figure-caption">The orange arc shows the "zone of change" — only keys in that slice had to move. Here, just key3 relocates from B to D. Compare to <code>hash mod N</code>, which would shuffle nearly everything.</p>
+      </div>
+
+      <p>Removing a server works the same way in reverse. Delete a server from the ring, and its keys get absorbed by whichever server sits clockwise. Every other key stays exactly where it is.</p>
+
+      <h2 id="vnodes"><span class="num">04</span>Virtual nodes, explained</h2>
+
+      <p>There's a problem with this basic design. When servers hash to random positions, some end up owning huge slices of the ring while others get tiny slivers. One server might hold 50% of your data; another holds 5%. That creates hotspots.</p>
+
+      <p>The fix: instead of each server planting <em>one flag</em> on the ring, it plants <strong>many small flags</strong> — 150 or 256 of them — at positions scattered all over. Each flag is called a <strong><a class="glink" href="../glossary.html#vnode">virtual node</a></strong> or <strong>vnode</strong>.</p>
+
+      <div class="callout">
+        <div class="callout-label">Important distinction</div>
+        A vnode is not a storage container. It's just a marker on the ring — a claim that says "this slice belongs to server-1." The actual data lives in the normal storage system on the physical server. One physical server with 150 vnodes still has one disk; the 150 vnodes are just 150 addresses that all route to the same machine.
+      </div>
+
+      <p>Vnodes serve two purposes at once:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Balanced load</h4>
+          <p>Sum enough small random slices and the totals even out. Each server ends up with a roughly fair share, and hotspots disappear.</p>
+        </div>
+        <div class="card">
+          <h4>Graceful failure</h4>
+          <p>When a server dies, its 150 small territories hand off to 150 different neighbors — spreading the load across the whole cluster instead of crushing one unlucky server.</p>
+        </div>
+      </div>
+
+      <h2 id="database"><span class="num">05</span>Where the data actually lives</h2>
+
+      <p>It's worth being precise about this because it's where intuition usually breaks down. There are two completely separate things in the database:</p>
+
+      <p><strong>The ring</strong> lives in memory on every server. It's a small routing table — maybe a few thousand entries — that says "ring position X is owned by server Y." It's used only to answer the question "which server owns this key?"</p>
+
+      <p><strong>The data</strong> lives on disk on individual servers. It's the actual key-value pairs like <code>alice → alice@example.com</code>. This can be billions of records.</p>
+
+      <p>Vnodes exist only in the ring. They never hold data. When a key routes to one of server-1's 150 vnodes, the request lands on server-1's physical machine, and server-1 stores the value in its own local database — alongside every other key that server owns.</p>
+
+      <p class="pullquote">Vnodes route. Servers store.</p>
+
+      <h2 id="replication"><span class="num">06</span>Replication and failure</h2>
+
+      <p>A key stored on only one server is a key you'll eventually lose. Real databases store each piece of data on multiple servers — typically three. This is called the <strong><a class="glink" href="../glossary.html#replication-factor">replication factor</a></strong>.</p>
+
+      <p>When a key is written, the database walks clockwise from the key's position and places copies on the next 3 <em>distinct physical servers</em>. "Distinct" matters: without that rule, three of server-1's vnodes might all be the closest flags, and you'd end up with three replicas all on the same machine — defeating the purpose.</p>
+
+      <h3>Rack-aware placement</h3>
+
+      <p>One more refinement: in a real datacenter, "next clockwise distinct server" can land all three replicas on the same rack — and a rack-level failure (a top-of-rack switch dies, a power phase trips) takes them all out together. Production systems extend the rule to "next clockwise distinct <em>rack</em>" or "next clockwise distinct <em>availability zone</em>." That single tweak is what turns a rack outage from catastrophic into routine.</p>
+
+      <h2 id="crash"><span class="num">07</span>When a server dies</h2>
+
+      <p>Server-2 catches fire at 3 a.m. Its disk is gone. Here's what actually happens:</p>
+
+      <h3>Within seconds</h3>
+
+      <p>The other servers run a <a class="glink" href="../glossary.html#gossip">gossip protocol</a> — constant heartbeat pings between peers. When server-2 stops responding, its peers mark it as down and spread the news. Within 10–30 seconds, every surviving server updates its ring view and removes server-2's vnodes.</p>
+
+      <p>Now when alice logs in, her lookup walks clockwise from her position, skips past the (now-absent) server-2 vnodes, and lands on server-3's vnode instead. Server-3 already had her as a replica, so it just serves the read. Alice never noticed anything happened.</p>
+
+      <h3>Over the next few hours</h3>
+
+      <p>The cluster is now <em>under-replicated</em>. Keys that used to have 3 copies are down to 2. A background repair process slowly identifies every affected key and copies it to a new third replica somewhere, restoring the replication factor. This happens gradually to avoid overwhelming the cluster with a sudden flood of traffic.</p>
+
+      <div class="callout">
+        <div class="callout-label">The beautiful part</div>
+        The ring lookup logic doesn't change when a server dies. It's still "hash the key, walk clockwise, find the owner." The only difference is that one server's vnodes are no longer on the ring, so walks end at the next survivor — a server that, by design, already has a replica.
+      </div>
+
+      <p>Because server-2's 150 vnodes were scattered around the ring, its load doesn't dump onto a single unlucky neighbor. Each of its 150 small territories hands off to a different next-clockwise server. The dead server's workload distributes evenly across the entire cluster — no cascading failure.</p>
+
+      <h2 id="takeaway"><span class="num">08</span>The one-line takeaway</h2>
+
+      <p class="pullquote">A ring of servers where every key walks clockwise to find its home — and that simple rule means adding, removing, or losing servers only reshuffles a small slice of your data instead of all of it.</p>
+
+      <p>Everything else — vnodes, replication, gossip, repair — is just making that simple rule work at scale, under failure, with balanced load. The elegance of the system is that the same routing logic works in normal operation and during disasters. No special failure paths. Just a circle, a clockwise walk, and data pre-positioned on the replicas that will inevitably become the new primaries.</p>
+
+      <p>Consistent hashing is one of those rare ideas that looks almost trivial once you see it, yet quietly holds up enormous parts of the modern internet. The next time you load a video on Netflix, send a message on Discord, or query DynamoDB — somewhere underneath, a key is walking clockwise around a ring, finding its server.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#hash-ring">hash ring</a><a href="../glossary.html#vnode">vnode</a><a href="../glossary.html#replication-factor">replication factor</a><a href="../glossary.html#gossip">gossip</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="cap-theorem.html">
+              <span class="related-arrow">→</span>
+              <span>CAP Theorem</span>
+              <span class="related-summary">— the trade-off the ring inherits the moment a partition happens.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../performance/throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Throughput</span>
+              <span class="related-summary">— hot keys remain a throughput problem the ring doesn't solve.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../reliability/resilience-patterns.html">
+              <span class="related-arrow">→</span>
+              <span>Resilience Patterns</span>
+              <span class="related-summary">— what happens when the read/write quorum can't be reached.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 02 · Distribution. <a href="index.html" style="color: var(--accent)">Back to theme →</a> · Based on the Dynamo paper (2007)
+    </footer>
+  </body>
+</html>

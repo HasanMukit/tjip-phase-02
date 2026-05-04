@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concurrency vs Parallelism — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Execution model</a></div>
+        <h1>Concurrency vs <em>parallelism</em></h1>
+        <p class="deck">Concurrency is having many things in progress. Parallelism is doing many things at once. They look the same on a busy graph and they aren't the same idea.</p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Execution model</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#mix">A mix-up worth fixing</a></li>
+          <li><a href="#defs">Two precise definitions</a></li>
+          <li><a href="#jugglers">The jugglers analogy</a></li>
+          <li><a href="#kitchen">The kitchen analogy</a></li>
+          <li><a href="#shapes">Four combinations</a></li>
+          <li><a href="#worked">A worked example — 20 requests, 4 cores</a></li>
+          <li><a href="#why">Why the distinction matters</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">Two of the most important words in software engineering are routinely treated as synonyms by people who should know better. <em>Concurrency</em> and <em>parallelism</em> describe different things — one is about how the program is structured, the other about how the hardware runs it — and conflating them leads to wrong design choices. A program can be highly concurrent on a single core that does exactly one thing at a time. Another program can be deeply parallel and yet poorly structured for it. Knowing which property you're after is half the work of building fast systems.</p>
+
+      <p>This page is about the distinction, the famous analogy that makes it stick, and the four combinations you actually see in practice.</p>
+
+      <h2 id="mix"><span class="num">01</span>A mix-up worth fixing</h2>
+
+      <p>The shortest version of the misunderstanding: people think "concurrent" means "running at the same time." It doesn't. "Running at the same time" is parallelism. Concurrency is something subtler — it's about <em>how the program is composed</em> so that multiple tasks can be in flight, not about whether they happen to execute simultaneously on the hardware. A single-threaded JavaScript program juggling thousands of HTTP requests is concurrent. None of those requests are running in parallel — there's only one thread — but they're all in progress.</p>
+
+      <p>The clearest version of the distinction was popularized by Rob Pike in his 2012 talk <em>Concurrency Is Not Parallelism</em>. His phrasing has aged well:</p>
+
+      <p class="pullquote">Concurrency is the composition of independently executing things. Parallelism is the simultaneous execution of (possibly related) things. — Rob Pike</p>
+
+      <p>Concurrency is a property of the <strong>program</strong>: it's about how you structured the work into independent pieces that don't have to be in lockstep. Parallelism is a property of the <strong>execution</strong>: it's about whether the hardware actually runs those pieces at the same instant. The first enables the second, but neither implies the other.</p>
+
+      <h2 id="defs"><span class="num">02</span>Two precise definitions</h2>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Concurrency</h4>
+          <p>Multiple tasks <em>in progress</em>, making progress over the same span of time. The program is structured so that tasks can be started, paused, and resumed independently. A single-core machine running a multi-threaded program is concurrent: the OS interleaves the threads, so all of them are "in flight" even though only one is running at any instant.</p>
+        </div>
+        <div class="card">
+          <h4>Parallelism</h4>
+          <p>Multiple tasks <em>executing simultaneously</em>, at the same physical instant, on different hardware. Requires more than one core (or more than one machine, GPU lane, etc.). A program that uses 8 cores at once to process an array is parallel; a program that has 8 threads on a single core is not.</p>
+        </div>
+      </div>
+
+      <p>The clean rule that falls out: <strong>concurrency is about <em>structure</em>; parallelism is about <em>execution</em></strong>. Structure can exist without simultaneous execution. Simultaneous execution can be wasted on poorly structured code. The two ideas are orthogonal — you can have either, both, or neither.</p>
+
+      <h2 id="jugglers"><span class="num">03</span>The jugglers analogy</h2>
+
+      <p>Pike's analogy makes the distinction physical. Imagine a circus act with balls and jugglers:</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The four combinations as jugglers</div>
+        <svg viewBox="0 0 640 380" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="20" width="290" height="160" rx="6" fill="none" stroke="var(--rule)" />
+          <text x="40" y="48" class="svg-text-bold" fill="var(--muted)">Sequential</text>
+          <text x="40" y="65" class="svg-text-muted">one juggler, one ball</text>
+
+          <circle cx="120" cy="115" r="22" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="120" y="120" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">J</text>
+          <circle cx="120" cy="80" r="6" fill="var(--accent)" />
+
+          <text x="180" y="115" class="svg-text-muted">no concurrency</text>
+          <text x="180" y="132" class="svg-text-muted">no parallelism</text>
+          <text x="180" y="155" class="svg-text" fill="var(--ink)">finish, then start the next</text>
+
+          <rect x="330" y="20" width="290" height="160" rx="6" fill="none" stroke="var(--s1)" />
+          <text x="350" y="48" class="svg-text-bold" fill="var(--s1)">Concurrent only</text>
+          <text x="350" y="65" class="svg-text-muted">one juggler, many balls</text>
+
+          <circle cx="430" cy="115" r="22" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="430" y="120" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">J</text>
+          <circle cx="430" cy="76" r="6" fill="var(--accent)" />
+          <circle cx="408" cy="86" r="6" fill="var(--s1)" />
+          <circle cx="452" cy="86" r="6" fill="var(--s3)" />
+          <circle cx="395" cy="105" r="6" fill="var(--s4)" />
+
+          <text x="490" y="115" class="svg-text-muted">concurrency</text>
+          <text x="490" y="132" class="svg-text-muted">no parallelism</text>
+          <text x="490" y="155" class="svg-text" fill="var(--ink)">interleave; one ball at a time</text>
+
+          <rect x="20" y="200" width="290" height="160" rx="6" fill="none" stroke="var(--s1)" />
+          <text x="40" y="228" class="svg-text-bold" fill="var(--s1)">Parallel only</text>
+          <text x="40" y="245" class="svg-text-muted">many jugglers, one ball each</text>
+
+          <circle cx="80" cy="295" r="22" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="80" y="300" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">J</text>
+          <circle cx="80" cy="260" r="6" fill="var(--accent)" />
+
+          <circle cx="150" cy="295" r="22" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="150" y="300" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">J</text>
+          <circle cx="150" cy="260" r="6" fill="var(--s1)" />
+
+          <text x="200" y="295" class="svg-text-muted">no shared composition</text>
+          <text x="200" y="312" class="svg-text" fill="var(--ink)">parallel without concurrency:</text>
+          <text x="200" y="328" class="svg-text-muted">independent tasks, separate lanes</text>
+
+          <rect x="330" y="200" width="290" height="160" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.5" />
+          <text x="350" y="228" class="svg-text-bold" fill="var(--accent)">Concurrent &amp; parallel</text>
+          <text x="350" y="245" class="svg-text-muted">many jugglers, many balls each</text>
+
+          <circle cx="390" cy="295" r="22" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="390" y="300" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">J</text>
+          <circle cx="390" cy="258" r="5" fill="var(--accent)" />
+          <circle cx="372" cy="268" r="5" fill="var(--s1)" />
+          <circle cx="408" cy="268" r="5" fill="var(--s3)" />
+
+          <circle cx="460" cy="295" r="22" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.5" />
+          <text x="460" y="300" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">J</text>
+          <circle cx="460" cy="258" r="5" fill="var(--accent)" />
+          <circle cx="442" cy="268" r="5" fill="var(--s1)" />
+          <circle cx="478" cy="268" r="5" fill="var(--s3)" />
+
+          <text x="510" y="295" class="svg-text" fill="var(--ink)">concurrency</text>
+          <text x="510" y="312" class="svg-text" fill="var(--ink)">+ parallelism</text>
+          <text x="510" y="335" class="svg-text-muted">shared work split across lanes</text>
+        </svg>
+        <p class="figure-caption">A juggler is a CPU core. Balls are tasks. <em>Sequential</em>: one ball, one juggler, finish before starting the next. <em>Concurrent only</em>: one juggler interleaves many balls — every ball is in flight, but only one is in their hands at any instant. <em>Parallel only</em>: many jugglers, each handling one ball — multiple things at once but no composition. <em>Concurrent and parallel</em>: many jugglers, each interleaving many balls, all coordinated.</p>
+      </div>
+
+      <p>Two takeaways from the analogy. First, "concurrent" is what one juggler with many balls is doing — a structural achievement of the juggler, not a fact about how many objects are in the air at the same instant. Second, "parallel" is what two jugglers with one ball each are doing — a fact about simultaneity, with or without the structural cleverness.</p>
+
+      <h2 id="kitchen"><span class="num">04</span>The kitchen analogy</h2>
+
+      <p>The juggler analogy makes the <em>shape</em> of the distinction obvious. The kitchen analogy makes the <em>payoff</em> obvious — why an engineer would bother structuring a program concurrently in the first place. Imagine one chef preparing a three-course meal: 20 minutes to boil rice, 5 minutes to chop vegetables, 10 minutes to simmer a sauce.</p>
+
+      <p>A sequential chef does each task to completion before starting the next. Boil the rice for 20 minutes, then chop for 5, then simmer the sauce for 10. Total wall-clock time: 35 minutes. The chef's hands are busy the whole time, but most of those 20 minutes of "boiling" was just standing there watching a pot.</p>
+
+      <p>A concurrent chef notices that <em>boiling rice does not require the chef</em>. So the chef starts the rice (zero active time — just toss it in the water), uses the next 5 minutes to chop vegetables, then spends 10 minutes building the sauce. The rice finishes around the same time. Total wall-clock time: 20 minutes. Same chef. Same hands. Same single-core human. The win came from <em>structuring the work so the waiting overlaps with the doing</em>.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Sequential vs concurrent chef on the same three dishes</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <text x="20" y="30" class="svg-text-bold" fill="var(--muted)">Sequential chef</text>
+          <text x="20" y="48" class="svg-text-muted">finish each dish before starting the next — 35 min total</text>
+
+          <text x="100" y="98" text-anchor="end" class="svg-text-muted">Chef:</text>
+          <rect x="110" y="80" width="280" height="28" rx="3" fill="var(--s1-soft)" stroke="var(--s1)" stroke-width="1" />
+          <text x="250" y="98" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">boil rice · 20m</text>
+
+          <rect x="392" y="80" width="70" height="28" rx="3" fill="var(--s2-soft)" stroke="var(--s2)" stroke-width="1" />
+          <text x="427" y="98" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">chop · 5m</text>
+
+          <rect x="464" y="80" width="140" height="28" rx="3" fill="var(--s3-soft)" stroke="var(--s3)" stroke-width="1" />
+          <text x="534" y="98" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">sauce · 10m</text>
+
+          <line x1="110" y1="120" x2="604" y2="120" stroke="var(--rule)" />
+          <line x1="110" y1="116" x2="110" y2="124" stroke="var(--rule)" />
+          <line x1="392" y1="116" x2="392" y2="124" stroke="var(--rule)" />
+          <line x1="464" y1="116" x2="464" y2="124" stroke="var(--rule)" />
+          <line x1="604" y1="116" x2="604" y2="124" stroke="var(--rule)" />
+          <text x="110" y="138" text-anchor="middle" class="svg-text-muted">0</text>
+          <text x="392" y="138" text-anchor="middle" class="svg-text-muted">20</text>
+          <text x="464" y="138" text-anchor="middle" class="svg-text-muted">25</text>
+          <text x="604" y="138" text-anchor="middle" class="svg-text-muted">35 min</text>
+
+          <line x1="20" y1="170" x2="620" y2="170" stroke="var(--rule)" stroke-dasharray="3,3" />
+
+          <text x="20" y="195" class="svg-text-bold" fill="var(--accent)">Concurrent chef</text>
+          <text x="20" y="213" class="svg-text-muted">start rice, chop while it boils, simmer sauce while rice finishes — 20 min total</text>
+
+          <text x="100" y="246" text-anchor="end" class="svg-text-muted">Rice:</text>
+          <rect x="110" y="232" width="280" height="20" rx="3" fill="var(--s1-soft)" stroke="var(--s1)" stroke-width="1" />
+          <text x="250" y="247" text-anchor="middle" class="svg-text" fill="var(--s1)">boil rice (unattended)</text>
+
+          <text x="100" y="272" text-anchor="end" class="svg-text-muted">Chop:</text>
+          <rect x="110" y="258" width="70" height="20" rx="3" fill="var(--s2-soft)" stroke="var(--s2)" stroke-width="1" />
+          <text x="145" y="273" text-anchor="middle" class="svg-text" fill="var(--s2)">chop</text>
+
+          <text x="100" y="298" text-anchor="end" class="svg-text-muted">Sauce:</text>
+          <rect x="180" y="284" width="140" height="20" rx="3" fill="var(--s3-soft)" stroke="var(--s3)" stroke-width="1" />
+          <text x="250" y="299" text-anchor="middle" class="svg-text" fill="var(--s3)">simmer sauce</text>
+        </svg>
+        <p class="figure-caption">The concurrent chef finishes 15 minutes faster on the same hardware (one chef, two hands). The win is structural: rice is I/O-bound — it cooks itself once started — so the chef's <em>active</em> time can be spent on other dishes. Add a second chef and you get parallelism on top.</p>
+      </div>
+
+      <p>The lesson generalizes cleanly. Replace "chef" with "CPU core," "boil rice" with "wait for a database query," and "chop vegetables" with "process the next request." A single-threaded server with one core can serve thousands of slow requests in the time a sequential server would serve a handful — not because the core is faster, but because the program lets it work on something else while the slow thing finishes on its own. That is the entire reason event loops, async/await, and goroutines exist.</p>
+
+      <h2 id="shapes"><span class="num">05</span>Four combinations</h2>
+
+      <p>All four corners of the table show up in real systems. Each one is the right answer for some workload.</p>
+
+      <h3>Sequential — neither</h3>
+
+      <p>One thread, one task at a time, no overlap. Most simple scripts and command-line tools live here. Slow if there are many tasks; perfectly fine if there's one. The conceptual baseline.</p>
+
+      <p><strong>Real-life example — a deploy script.</strong> Picture a typical bash deploy: <code>npm test &amp;&amp; npm run build &amp;&amp; rsync ./dist server:/var/www &amp;&amp; ssh server systemctl reload nginx</code>. Each step strictly depends on the one before it — there is no point in starting <code>rsync</code> before <code>build</code> finishes, because the directory it copies doesn't exist yet. The wall-clock time is the literal sum of every step. Trying to "make this concurrent" would change nothing because there is no waiting overlap to exploit; the dependency graph is a straight line. This is the right shape for migrations, one-shot data transformations, and most CLI utilities. Sequential isn't a failure mode — it's the correct answer when the work is genuinely ordered.</p>
+
+      <h3>Concurrent only — one core, many tasks in flight</h3>
+
+      <p>A single-threaded JavaScript runtime handling 10,000 simultaneous WebSocket connections. A Python <code>asyncio</code> server. Erlang's actor system on one core. Each task is in progress; none are running simultaneously, but the program <em>could</em> use parallelism if it had more cores. The structural win is real: the system doesn't block on one slow request just because nothing else is running. See <a href="event-loop.html">the JavaScript event loop</a> for the canonical example.</p>
+
+      <p><strong>Real-life example — a Node.js API on one core.</strong> Imagine an Express server backing a mobile app, running on a single vCPU container. A request comes in, the handler issues a Postgres query that takes 50 ms, then renders the JSON response. If the program were sequential, 5,000 requests at 50 ms each would take 250 seconds end to end and the server would handle exactly 20 requests per second. Instead, Node's event loop hands the query off to the OS, registers a callback, and immediately starts processing the next request. While Postgres is doing the actual database work — which the application's CPU is not involved in at all — the event loop is shepherding thousands of other in-flight requests through their own steps. The CPU stays close to 100% utilized doing useful work, and throughput climbs to thousands of requests per second on the same single core. Adding cores wouldn't help here because the bottleneck was never CPU; it was the program's willingness to wait. The fix was structural, not hardware.</p>
+
+      <h3>Parallel only — many cores, no shared composition</h3>
+
+      <p>Embarrassingly parallel work: render frames, hash files, train a neural-net layer's matrix multiply across GPU lanes. The tasks don't talk to each other and don't need to be interleaved — you just shard them across cores and collect results. Concurrency is barely involved because the tasks are independent.</p>
+
+      <p><strong>Real-life example — batch video encoding with <code>ffmpeg</code>.</strong> A media team has 200 raw video files that need to be transcoded to H.264 overnight. Each encode is purely CPU-bound, takes about 4 minutes per file, and is completely independent of every other file — no shared state, no ordering requirement, no need to communicate. Done sequentially on one core, that's 200 × 4 minutes = 13 hours. Run via GNU <code>parallel</code> on a 16-core machine — <code>parallel ffmpeg -i {} out/{.}.mp4 ::: *.mov</code> — and the same workload finishes in roughly 50 minutes (16× speedup, minus a small amount of disk contention). There is no clever concurrent structure in the application code; each <code>ffmpeg</code> process is a plain sequential program. The win comes entirely from the hardware running 16 of those plain programs at the same instant. This is what people mean by "embarrassingly parallel" — the speedup falls out of nothing more than replication.</p>
+
+      <h3>Concurrent and parallel — both</h3>
+
+      <p>The default model of most modern servers. A Go program with goroutines on a multi-core box: concurrency in the structure (many goroutines making progress, possibly waiting on I/O) and parallelism in the execution (the runtime spreads them across N cores). A Java application with a thread pool. A Node.js server with worker threads. The composition lets the program manage many in-flight tasks; the cores let those tasks really run at once.</p>
+
+      <p><strong>Real-life example — a Go API gateway on an 8-core box.</strong> Picture a payment-routing service: every incoming HTTP request fans out to three or four upstream services (fraud check, balance lookup, ledger write, notification), waits for them in parallel, combines the responses, and replies. The handler spawns one goroutine per request — under load there might be 20,000 goroutines alive at any moment, most of them parked waiting on a network response. That is the concurrent structure: tens of thousands of in-flight tasks, each making progress independently. Underneath, the Go runtime maintains a small pool of OS threads — by default one per CPU core — and multiplexes those 20,000 goroutines onto the 8 available threads. So at any single instant up to 8 goroutines are <em>literally executing simultaneously</em> (parallelism), while up to 20,000 are <em>logically in flight</em> (concurrency). CPU-bound work like JSON parsing spreads naturally across cores; I/O-bound waiting overlaps cheaply. Add a 16-core box and throughput roughly doubles, because the structure was already there to absorb the extra cores. This is the shape almost every backend service should aim for.</p>
+
+      <div class="callout">
+        <div class="callout-label">The trap people fall into</div>
+        Adding cores to a poorly-structured program does not magically parallelize it. If the program is one giant lock and one shared mutable object, all the cores will line up waiting for the same thing. Parallelism without good concurrent structure is just expensive sequential code. <em>"Concurrency enables parallelism, but doesn't guarantee it."</em>
+      </div>
+
+      <h2 id="worked"><span class="num">06</span>A worked example — 20 requests, 4 cores</h2>
+
+      <p>Numbers make the distinction concrete. Here are 20 HTTP requests landing on a single machine, traced through two scenarios on the same hardware: a single-threaded async runtime (concurrency only, one core) and a four-core thread-pool / goroutine scheduler (concurrency + parallelism). Pick a realistic per-request profile:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>2 ms of CPU</strong> — parse the HTTP request, route it, build the database query</li>
+        <li><strong>50 ms of I/O wait</strong> — Postgres runs the query; the application's CPU is doing nothing during this time</li>
+        <li><strong>3 ms of CPU</strong> — deserialize the result, serialize JSON, write the response</li>
+      </ul>
+
+      <p>Per request: 5 ms of CPU work bracketing 50 ms of network wait, totalling 55 ms in pure isolation. Assume all 20 requests are queued and ready at <code>t = 0</code>.</p>
+
+      <p><strong>Sequential baseline.</strong> One request fully finishes before the next starts: 20 × 55 ms = <strong>1100 ms wall-clock</strong>. Of that, only 100 ms is actual CPU work, so the core sits idle ~91 percent of the time. This is the dead-simple "no concurrency, no parallelism" baseline we're trying to beat.</p>
+
+      <h3>Concurrent only — 1 core, async event loop</h3>
+
+      <p>The runtime starts every request as soon as it can: 2 ms of CPU to register the database call, then yield to the event loop and pick up the next request. Twenty 2-ms "starts" run back-to-back from <code>t = 0</code> to <code>t = 40</code>. The first request's I/O completes at <code>t = 52</code>, leaving a 12 ms idle gap where the core has nothing to do — every request is waiting on Postgres. Then the "finish" work drains: 20 × 3 ms = 60 ms of back-to-back CPU bursts from <code>t = 52</code> to <code>t = 112</code>. <strong>Total wall-clock: 112 ms</strong> — a 9.8× speedup over sequential, on the same single core.</p>
+
+      <h3>Concurrent and parallel — 4 cores, thread pool</h3>
+
+      <p>Same 20 requests, same per-request profile, but now the runtime spreads them across 4 cores — 5 requests per core. Each core does its 5 starts (10 ms), waits 42 ms while all four cores' Postgres queries run in parallel, then drains its 5 finishes (15 ms). <strong>Total wall-clock: 67 ms</strong> — a further 1.7× speedup over the single-core concurrent version, and 16.4× over the sequential baseline.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 03 — Wall-clock to process all 20 requests</div>
+        <svg viewBox="0 0 640 220" xmlns="http://www.w3.org/2000/svg">
+          <text x="20" y="28" class="svg-text-bold" fill="var(--accent)">Same 20 requests, same hardware family, three execution models</text>
+
+          <text x="190" y="66" text-anchor="end" class="svg-text" fill="var(--ink)">Sequential</text>
+          <text x="190" y="82" text-anchor="end" class="svg-text-muted">1 core, no overlap</text>
+          <rect x="200" y="52" width="440" height="32" fill="var(--rule)" stroke="var(--muted)" />
+          <text x="630" y="72" text-anchor="end" class="svg-text-bold" fill="var(--ink)">1100 ms · 1×</text>
+
+          <text x="190" y="118" text-anchor="end" class="svg-text" fill="var(--ink)">Concurrent</text>
+          <text x="190" y="134" text-anchor="end" class="svg-text-muted">1 core, async event loop</text>
+          <rect x="200" y="104" width="45" height="32" fill="var(--s2-soft)" stroke="var(--s2)" />
+          <text x="255" y="124" class="svg-text-bold" fill="var(--s2)">112 ms · 9.8×</text>
+
+          <text x="190" y="170" text-anchor="end" class="svg-text" fill="var(--ink)">Concurrent + parallel</text>
+          <text x="190" y="186" text-anchor="end" class="svg-text-muted">4 cores, thread pool</text>
+          <rect x="200" y="156" width="27" height="32" fill="var(--accent-soft)" stroke="var(--accent)" />
+          <text x="237" y="176" class="svg-text-bold" fill="var(--accent)">67 ms · 16.4×</text>
+        </svg>
+        <p class="figure-caption">Concurrency alone bought the big win — almost 10× — because it converted I/O wait time from "blocking the core" into "happening in the background." Adding 4× the cores on top added another 1.7× because the workload is overwhelmingly I/O-bound; most of the wall-clock time is still Postgres, not the CPU.</p>
+      </div>
+
+      <p>The pattern is the lesson. <strong>Concurrency unlocked the I/O wait</strong> — that's where most of the dead time was, and one core was enough to absorb it. <strong>Parallelism added a smaller multiplier on top</strong> because there wasn't much CPU contention left to relieve. For a CPU-bound workload (image resizing, hashing, ML inference) the picture flips: concurrency on one core does almost nothing, and parallelism does almost everything. The right ordering is always: <em>structure first, then scale</em>. Add concurrency to attack the wait time; add cores to attack the compute time. Doing it in the wrong order — buying a 64-core box for a single-threaded blocking server — buys you 63 idle cores.</p>
+
+      <h2 id="why"><span class="num">07</span>Why the distinction matters</h2>
+
+      <p>The reason this matters in design conversations: the two ideas suggest different fixes. If your bottleneck is "the system can only handle 100 in-flight requests at a time," that's a concurrency problem — restructure the program to start more in flight. If your bottleneck is "the system handles 10,000 in-flight requests but is using 12% of one core," that's a parallelism problem — let the runtime spread them across cores.</p>
+
+      <p>Three common situations and which idea is being invoked:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>"Why is my single-threaded server so fast?"</strong> Concurrency, not parallelism. The event loop is keeping thousands of I/O-bound requests in flight on one core because the program is structured well. Adding cores would help only if the work became CPU-bound.</li>
+        <li><strong>"Why does my multi-threaded program not get faster on more cores?"</strong> Bad concurrency structure — too much shared state, too many locks, false sharing — so adding cores adds contention, not throughput. Restructure first; scale second.</li>
+        <li><strong>"Why does adding async/await everywhere not double my speed?"</strong> async/await adds concurrency (more in flight) but not parallelism (not more cores). On a single-threaded runtime, throughput per core is the same; you're just better at not blocking.</li>
+      </ul>
+
+      <p>The vocabulary lets you separate "we need a different program structure" from "we need more hardware." Often both are needed, but in different proportions.</p>
+
+      <h2 id="takeaway"><span class="num">08</span>The one-line takeaway</h2>
+
+      <p class="pullquote">Concurrency is the program's idea. Parallelism is the hardware's idea. Concurrency without parallelism is real and useful. Parallelism without concurrency is real and limited.</p>
+
+      <p>The mistake every junior engineer makes once: assuming "concurrent" implies "fast" and "parallel" implies "many cores." Both wrong. Concurrent code on one core is fast for I/O-bound work and meaningless for CPU-bound work. Parallel code is fast only if the program structure lets it spread without contention. The two questions — "does the program have many things in flight?" and "can it execute multiple things at once?" — have to be asked separately.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#green-thread">goroutine</a><a href="../glossary.html#race-condition">race condition</a><a href="../glossary.html#smt">SMT</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="event-loop.html">
+              <span class="related-arrow">→</span>
+              <span>The Event Loop</span>
+              <span class="related-summary">— the canonical concurrent-without-parallel runtime.</span>
+            </a>
+          </li>
+          <li>
+            <a href="context-switching.html">
+              <span class="related-arrow">→</span>
+              <span>Context Switching</span>
+              <span class="related-summary">— the cost of having many things in flight.</span>
+            </a>
+          </li>
+          <li>
+            <a href="core-pinning.html">
+              <span class="related-arrow">→</span>
+              <span>Core Pinning</span>
+              <span class="related-summary">— the parallelism choice taken to its endgame.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Execution model. <a href="index.html" style="color: var(--accent)">Back to theme →</a> · Inspired by Rob Pike's "Concurrency Is Not Parallelism" (2012)
+    </footer>
+  </body>
+</html>

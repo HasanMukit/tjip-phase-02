@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Memory Hierarchy — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Hardware</a></div>
+        <h1>The memory <em>hierarchy</em></h1>
+        <p class="deck">
+          Registers, L1, L2, L3, RAM, SSD, HDD, network. Each tier is faster, smaller, and more expensive than the one
+          below. Every performance decision lives somewhere in this pyramid.
+        </p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Hardware</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#why">Why a hierarchy at all</a></li>
+          <li><a href="#tiers">The eight tiers, top to bottom</a></li>
+          <li><a href="#caches">L1, L2, L3 — three caches, three jobs</a></li>
+          <li><a href="#fastest">What's the "fastest" storage?</a></li>
+          <li><a href="#tradeoffs">Speed vs size vs cost</a></li>
+          <li><a href="#ephemeral">Ephemeral vs persistent</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">
+        If you could buy a single kind of memory that was instant, infinite, free, and survived a power cut, computers
+        would have one tier. We can't, so they have eight. Each tier is faster than the one below it by a factor of ten
+        to a thousand, smaller by a similar ratio, and more expensive per byte by even more. That whole stack — the
+        trade-off you can't escape — is the memory hierarchy. Almost every performance decision is really a question of
+        which tier you're paying for.
+      </p>
+
+      <p>This page walks the pyramid: registers at the top, tape at the bottom, and the trade-offs that put each tier where it sits.</p>
+
+      <h2 id="why"><span class="num">01</span>Why a hierarchy at all</h2>
+
+      <p>Every storage technology trades three things against each other:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Speed</h4>
+          <p>
+            How fast you can read or write a byte — measured in latency (ns, µs, ms) and bandwidth (GB/s). Set by
+            physics: gate switching speed, distance from the CPU, mechanical motion, the speed of light over a cable.
+          </p>
+        </div>
+        <div class="card">
+          <h4>Size</h4>
+          <p>
+            How many bytes fit. Set by density and floor space — registers are tiny because they live inside the CPU;
+            tape is enormous because it spools cheaply.
+          </p>
+        </div>
+        <div class="card">
+          <h4>Cost</h4>
+          <p>
+            Dollars per byte. Set by manufacturing complexity.
+            <a class="glink" href="../glossary.html#sram">SRAM</a> is fast and brutal to fabricate; magnetic tape is
+            dense and almost free per gigabyte.
+          </p>
+        </div>
+        <div class="card">
+          <h4>Persistence</h4>
+          <p>
+            Does it survive losing power? Volatile tiers (registers, cache, RAM) lose state on reboot; non-volatile
+            tiers (SSD, HDD, tape) keep it. The boundary matters more than people think.
+          </p>
+        </div>
+      </div>
+
+      <p>
+        No single technology wins on all axes. SRAM is fast but expensive.
+        <a class="glink" href="../glossary.html#dram">DRAM</a> is cheaper but slower. Flash is non-volatile but slower
+        still. Spinning disk is dirt cheap per byte but glacial. So real machines stack them: a tiny scoop of the
+        fastest stuff right next to the CPU, a bucket of medium-fast stuff a little further out, and a swimming pool of
+        slow-but-cheap stuff for everything else.
+      </p>
+
+      <p class="pullquote">
+        The hierarchy exists because we can't have one memory that's fast, big, and cheap. We have to lie to the CPU —
+        pretend that the slow tier is fast, by keeping a copy of the hot bits one tier up.
+      </p>
+
+      <h2 id="tiers"><span class="num">02</span>The eight tiers, top to bottom</h2>
+
+      <p>From the chip outward. Sizes and timings are 2026 ballpark for a typical server CPU; treat them as orders of magnitude, not specs.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The pyramid</div>
+        <svg viewBox="0 0 640 540" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="280,20 360,20 410,80 230,80" fill="var(--s1)" opacity="0.95" />
+          <text x="320" y="55" text-anchor="middle" class="svg-text-bold" fill="white">Registers</text>
+
+          <polygon points="225,85 415,85 445,135 195,135" fill="var(--s1)" opacity="0.85" />
+          <text x="320" y="115" text-anchor="middle" class="svg-text-bold" fill="white">L1 cache (per core)</text>
+
+          <polygon points="190,140 450,140 480,190 160,190" fill="var(--s2)" opacity="0.85" />
+          <text x="320" y="170" text-anchor="middle" class="svg-text-bold" fill="white">L2 cache (per core)</text>
+
+          <polygon points="155,195 485,195 515,245 125,245" fill="var(--s2)" opacity="0.7" />
+          <text x="320" y="225" text-anchor="middle" class="svg-text-bold" fill="white">L3 cache (shared)</text>
+
+          <polygon points="120,250 520,250 555,310 85,310" fill="var(--s3)" opacity="0.85" />
+          <text x="320" y="285" text-anchor="middle" class="svg-text-bold" fill="white">Main memory (DRAM)</text>
+
+          <polygon points="80,315 560,315 595,375 45,375" fill="#8b5a2b" opacity="0.9" />
+          <text x="320" y="350" text-anchor="middle" class="svg-text-bold" fill="white">NVMe SSD</text>
+
+          <polygon points="40,380 600,380 625,430 15,430" fill="var(--s4)" opacity="0.8" />
+          <text x="320" y="410" text-anchor="middle" class="svg-text-bold" fill="white">HDD &amp; network storage</text>
+
+          <polygon points="10,435 630,435 630,490 10,490" fill="var(--muted)" opacity="0.5" />
+          <text x="320" y="467" text-anchor="middle" class="svg-text-bold" fill="white">Tape &amp; cold archive</text>
+
+          <text x="50" y="55" class="svg-text-muted">~0.3 ns</text>
+          <text x="50" y="115" class="svg-text-muted">~1 ns · 32–64 KB</text>
+          <text x="40" y="170" class="svg-text-muted">~3 ns · 256 KB–1 MB</text>
+          <text x="30" y="225" class="svg-text-muted">~10 ns · 8–64 MB</text>
+          <text x="20" y="285" class="svg-text-muted">~80 ns · 32–512 GB</text>
+          <text x="555" y="350" text-anchor="end" class="svg-text-bold" fill="white">~30 µs · 1–8 TB</text>
+          <text x="595" y="410" text-anchor="end" class="svg-text-bold" fill="white">~10 ms · 10s of TB</text>
+          <text x="600" y="467" text-anchor="end" class="svg-text-bold" fill="white">seconds–minutes · PB</text>
+
+          <text x="320" y="525" text-anchor="middle" class="svg-text-muted">faster &amp; smaller above · cheaper &amp; bigger below</text>
+        </svg>
+        <p class="figure-caption">
+          A real pyramid. Each tier is roughly 10–1,000× slower than the one above and ~10–100× larger. The CPU sits at
+          the top and pulls bytes downward only when forced to — every miss into a lower tier is a tax.
+        </p>
+      </div>
+
+      <h3>Registers — the CPU's hands</h3>
+
+      <p>
+        A few hundred bytes living inside the CPU itself. Sub-nanosecond access — they don't have a "latency" so much as
+        they're the inputs to the next instruction. Every value the CPU operates on must be in a register; loads and
+        stores exist precisely to move things in and out. Compilers spend enormous effort minimizing register pressure.
+      </p>
+
+      <h3>L1 cache — the snack drawer</h3>
+
+      <p>
+        32–64 KB per core, ~1 ns access. Split into separate instruction and data halves (L1i / L1d). This is what makes
+        loops fast — touch the same data again and it's already here. Miss it and you fall to L2.
+      </p>
+
+      <h3>L2 cache — the pantry</h3>
+
+      <p>
+        256 KB to 1 MB per core, ~3 ns. A bigger backstop for L1 misses. Still per-core on modern Intel and AMD chips.
+        Big enough to hold a hot inner data structure but not your whole working set.
+      </p>
+
+      <h3>L3 cache — the shared fridge</h3>
+
+      <p>
+        8–64 MB, ~10 ns, shared by all cores on the same socket. This is where cores hand data to each other (and where
+        they fight over it). A cross-core read of "your" L1 line goes through L3 — that's what makes shared-mutable
+        concurrency expensive.
+      </p>
+
+      <h3>Main memory (DRAM) — the kitchen</h3>
+
+      <p>
+        Tens to hundreds of GB, ~80 ns, ~100 GB/s of bandwidth on modern
+        <a class="glink" href="../glossary.html#ddr5">DDR5</a>. Big enough to hold most working sets; slow enough that a
+        cache miss is a noticeable stall. The CPU literally idles for ~250 cycles waiting on a DRAM read — which is why
+        caches exist.
+      </p>
+
+      <h3>NVMe SSD — the basement</h3>
+
+      <p>
+        1–8 TB, ~30 µs random read, several GB/s sequential. Persistent. Fast enough that databases live here happily;
+        slow enough relative to RAM that databases also try to keep their hot pages cached in DRAM. The tier where "in
+        memory" stops being true.
+      </p>
+
+      <h3>HDD &amp; network storage — the warehouse</h3>
+
+      <p>
+        Tens of TB, ~10 ms per random seek, ~150 MB/s sequential. The mechanical floor. S3 and similar object stores
+        live in this neighbourhood latency-wise even though they're SSD-backed, because the network round-trip dominates.
+        Cheap, durable, slow.
+      </p>
+
+      <h3>Tape &amp; cold archive — the off-site vault</h3>
+
+      <p>
+        Petabytes, seconds to minutes of access latency, fractions of a cent per GB-month. You don't read this tier in a
+        request path; you read it for compliance, recovery, or analytics on years-old data. The end of the line.
+      </p>
+
+      <h2 id="caches"><span class="num">03</span>L1, L2, L3 — three caches, three jobs</h2>
+
+      <p>
+        The three CPU caches aren't just "more of the same memory." They have different sizes for different jobs, and
+        the differences are deliberate.
+      </p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Inside one CPU socket</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="20" width="560" height="280" rx="8" fill="none" stroke="var(--rule)" stroke-width="1.5" />
+          <text x="60" y="42" class="svg-text-bold" fill="var(--muted)">CPU SOCKET</text>
+
+          <rect x="60" y="60" width="120" height="120" rx="6" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="1" />
+          <text x="120" y="80" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">Core 0</text>
+          <rect x="75" y="92" width="90" height="22" fill="var(--s1)" opacity="0.85" />
+          <text x="120" y="108" text-anchor="middle" class="svg-text-bold" fill="white">L1 (1 ns)</text>
+          <rect x="75" y="120" width="90" height="22" fill="var(--s1)" opacity="0.55" />
+          <text x="120" y="136" text-anchor="middle" class="svg-text-bold" fill="white">L2 (3 ns)</text>
+          <text x="120" y="170" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="200" y="60" width="120" height="120" rx="6" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="1" />
+          <text x="260" y="80" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">Core 1</text>
+          <rect x="215" y="92" width="90" height="22" fill="var(--s1)" opacity="0.85" />
+          <text x="260" y="108" text-anchor="middle" class="svg-text-bold" fill="white">L1 (1 ns)</text>
+          <rect x="215" y="120" width="90" height="22" fill="var(--s1)" opacity="0.55" />
+          <text x="260" y="136" text-anchor="middle" class="svg-text-bold" fill="white">L2 (3 ns)</text>
+          <text x="260" y="170" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="340" y="60" width="120" height="120" rx="6" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="1" />
+          <text x="400" y="80" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">Core 2</text>
+          <rect x="355" y="92" width="90" height="22" fill="var(--s1)" opacity="0.85" />
+          <text x="400" y="108" text-anchor="middle" class="svg-text-bold" fill="white">L1 (1 ns)</text>
+          <rect x="355" y="120" width="90" height="22" fill="var(--s1)" opacity="0.55" />
+          <text x="400" y="136" text-anchor="middle" class="svg-text-bold" fill="white">L2 (3 ns)</text>
+          <text x="400" y="170" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="480" y="60" width="100" height="120" rx="6" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="1" />
+          <text x="530" y="80" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">Core 3</text>
+          <rect x="490" y="92" width="80" height="22" fill="var(--s1)" opacity="0.85" />
+          <text x="530" y="108" text-anchor="middle" class="svg-text-bold" fill="white">L1</text>
+          <rect x="490" y="120" width="80" height="22" fill="var(--s1)" opacity="0.55" />
+          <text x="530" y="136" text-anchor="middle" class="svg-text-bold" fill="white">L2</text>
+          <text x="530" y="170" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="60" y="200" width="520" height="50" rx="6" fill="var(--s2)" opacity="0.7" />
+          <text x="320" y="222" text-anchor="middle" class="svg-text-bold" fill="white">L3 cache — shared (10 ns, 8–64 MB)</text>
+          <text x="320" y="240" text-anchor="middle" class="svg-text-bold" fill="white">where cores meet</text>
+
+          <line x1="120" y1="180" x2="120" y2="200" stroke="var(--muted)" stroke-width="1.5" />
+          <line x1="260" y1="180" x2="260" y2="200" stroke="var(--muted)" stroke-width="1.5" />
+          <line x1="400" y1="180" x2="400" y2="200" stroke="var(--muted)" stroke-width="1.5" />
+          <line x1="530" y1="180" x2="530" y2="200" stroke="var(--muted)" stroke-width="1.5" />
+
+          <text x="320" y="285" text-anchor="middle" class="svg-text-muted">↓ DRAM (~80 ns) is off-chip below this point</text>
+        </svg>
+        <p class="figure-caption">
+          L1 and L2 are <em>private</em> — each core has its own. L3 is <em>shared</em> across the socket and is where
+          cores synchronize. A <a class="glink" href="../glossary.html#cache-line">cache line</a> written by one core
+          has to travel down to L3 (or worse) before another core can read it; that's the hidden cost of shared-mutable
+          state.
+        </p>
+      </div>
+
+      <h3>L1 — small, fast, split</h3>
+
+      <p>
+        L1 is tiny on purpose. Smaller circuits switch faster and decode faster; that's how it stays at ~1 ns. It's also
+        <em>split</em>: separate L1i (instructions) and L1d (data), so the CPU can fetch the next instruction and the
+        data it operates on in the same cycle without contention. Almost every cycle of a tight loop runs entirely out
+        of L1.
+      </p>
+
+      <h3>L2 — bigger, single, still private</h3>
+
+      <p>
+        L2 is the L1 backstop: bigger (so more fits) but slightly slower (because bigger circuits take longer to
+        address). Unified — instructions and data share it. Still per-core, so no contention with neighboring cores. If
+        your inner loop's working set fits in L2 you'll be fast; if it doesn't, every L1 miss falls to ~3 ns.
+      </p>
+
+      <h3>L3 — large, shared, the rendezvous</h3>
+
+      <p>
+        L3 is the meeting point. All cores on the socket can see it, which makes inter-core communication cheap-ish (~10
+        ns) but introduces <a class="glink" href="../glossary.html#coherence">coherence</a>: when one core writes to an
+        address, every other core's L1/L2 copies of that line must be invalidated or updated. That protocol —
+        <a class="glink" href="../glossary.html#mesi">MESI</a>, MOESI, or a variant — is invisible until you write
+        multi-threaded code, at which point it becomes the dominant cost.
+        <a class="glink" href="../glossary.html#false-sharing">False sharing</a> is what happens when this goes wrong.
+      </p>
+
+      <div class="callout">
+        <div class="callout-label">Why three levels and not four?</div>
+        Each level has to be enough faster than the next to be worth maintaining a separate copy. Three has been the
+        sweet spot for ~15 years; some chips experiment with a smaller "L0" micro-op cache or a victim L4 in DRAM, but
+        the three-tier on-chip arrangement has stuck because it matches workload sizes well: tight loops in L1, hot data
+        structures in L2, working sets in L3.
+      </div>
+
+      <h2 id="fastest"><span class="num">04</span>What's the "fastest" storage?</h2>
+
+      <p>Trick question — the answer depends on how you define "storage." Each candidate has a case:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Latency</th>
+            <th>Capacity</th>
+            <th>"Storage"?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Registers</td>
+            <td class="mono">&lt; 0.3 ns</td>
+            <td class="mono">~few hundred bytes</td>
+            <td>arguably not — they're CPU operands</td>
+          </tr>
+          <tr>
+            <td>L1 cache</td>
+            <td class="mono">~1 ns</td>
+            <td class="mono">32–64 KB</td>
+            <td>yes — first thing called "memory"</td>
+          </tr>
+          <tr>
+            <td>DRAM</td>
+            <td class="mono">~80 ns</td>
+            <td class="mono">tens to hundreds of GB</td>
+            <td>yes — what most people mean by "memory"</td>
+          </tr>
+          <tr>
+            <td>NVMe SSD</td>
+            <td class="mono">~30 µs</td>
+            <td class="mono">terabytes</td>
+            <td>yes — first <em>persistent</em> tier</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        If "storage" means "things you address with a pointer and treat as memory,"
+        <strong>registers are the fastest</strong>. If it means "the first tier you'd recognize as memory, with byte
+        addresses you can store data into," <strong>L1 cache is the fastest</strong>. If it means "memory the way most
+        programmers talk about it," that's <strong>DRAM</strong>. And if it means "the fastest <em>persistent</em>
+        storage" — keeping data through a power cut — the answer flips entirely to <strong>NVMe SSD</strong>, which is
+        six orders of magnitude slower than L1 but the first tier that survives.
+      </p>
+
+      <p>
+        The honest one-line answer to "what's the fastest storage in a computer?" is
+        <em>"registers, by definition; L1 cache, in practice."</em> The interview-friendly answer is "registers." Either
+        way, the lesson is that "fastest" is a question about the unit of measurement.
+      </p>
+
+      <h2 id="tradeoffs"><span class="num">05</span>Speed vs size vs cost</h2>
+
+      <p>Why doesn't everyone just have 1 TB of L1 cache? Because the trade-off is brutal in both directions. Here's the rough shape, in 2026 dollars per gigabyte:</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 03 — Cost falls as you go down</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <line x1="80" y1="280" x2="80" y2="40" stroke="var(--rule)" stroke-width="1" />
+          <line x1="80" y1="280" x2="600" y2="280" stroke="var(--rule)" stroke-width="1" />
+          <text x="80" y="30" text-anchor="middle" class="svg-text-muted">$/GB</text>
+          <text x="600" y="300" text-anchor="middle" class="svg-text-muted">capacity →</text>
+
+          <circle cx="120" cy="60" r="8" fill="var(--s1)" />
+          <text x="135" y="64" class="svg-text-bold" fill="var(--ink)">SRAM (cache) — ~$1,000+/GB · KBs–MBs</text>
+
+          <circle cx="200" cy="120" r="8" fill="var(--s2)" />
+          <text x="215" y="124" class="svg-text-bold" fill="var(--ink)">DRAM — ~$3–5/GB · 32–512 GB</text>
+
+          <circle cx="320" cy="190" r="8" fill="#8b5a2b" />
+          <text x="335" y="194" class="svg-text-bold" fill="var(--ink)">NVMe SSD — ~$0.08/GB · TBs</text>
+
+          <circle cx="450" cy="240" r="8" fill="var(--s4)" />
+          <text x="465" y="244" class="svg-text-bold" fill="var(--ink)">HDD — ~$0.015/GB · 10s of TBs</text>
+
+          <circle cx="555" cy="270" r="8" fill="var(--muted)" />
+          <text x="555" y="262" text-anchor="middle" class="svg-text-bold" fill="var(--ink)">Tape</text>
+          <text x="555" y="295" text-anchor="middle" class="svg-text-muted">~$0.003/GB · PBs</text>
+
+          <path d="M 120 60 Q 240 90 320 190 Q 420 240 555 270" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.6" />
+
+          <text x="320" y="20" text-anchor="middle" class="svg-text-muted">~5 orders of magnitude in price per byte, top to bottom</text>
+        </svg>
+        <p class="figure-caption">
+          Each tier is roughly 10–100× cheaper per byte than the one above and roughly 10–1,000× slower. The pyramid
+          isn't an aesthetic choice — it's the cheapest way to get "enough fast bytes" without paying SRAM prices for
+          everything.
+        </p>
+      </div>
+
+      <h3>Why fast is expensive</h3>
+
+      <p>
+        L1's SRAM uses six transistors per bit and has to be physically close to the CPU's execution units — every
+        micrometer of distance adds picoseconds of signal travel. DRAM uses one transistor and one capacitor per bit
+        (cheaper, denser) but has to be refreshed and lives further from the CPU. Flash uses a charged floating gate (no
+        power needed to retain) but switching it is slow. Magnetic platters store bits as patches of polarity on a
+        moving surface — basically free per byte, terrible to read.
+      </p>
+
+      <h3>Why big is slow</h3>
+
+      <p>
+        This one isn't intuitive but matters: <em>any</em> memory grows slower as it grows bigger. The address decoder
+        takes longer to select a row, the bus has more capacitive load, the wires get longer. That's why we don't just
+        build a 1 GB L1 — even ignoring cost, it would be slower than L2 because of pure circuit physics.
+      </p>
+
+      <h3>Why every architecture looks like this</h3>
+
+      <p>
+        Smartphones, laptops, servers, GPUs, microcontrollers — they all have some flavour of the same hierarchy. The
+        numbers shift but the shape doesn't, because the underlying physics doesn't. A GPU has registers, shared memory
+        (its L1), L2, and <a class="glink" href="../glossary.html#hbm">HBM</a> (its DRAM). A microcontroller might
+        collapse to two tiers (registers + flash) but the pattern is there.
+      </p>
+
+      <h2 id="ephemeral"><span class="num">06</span>Ephemeral vs persistent</h2>
+
+      <p>
+        There's a hard line drawn through the pyramid: above it, everything dies when power is cut. Below it, everything
+        survives. Knowing which side of the line a piece of state lives on is one of the most consequential design
+        decisions in any system.
+      </p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 04 — The volatility line</div>
+        <svg viewBox="0 0 640 280" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="40" width="560" height="100" rx="6" fill="var(--s2)" opacity="0.15" stroke="var(--s2)" stroke-width="1" />
+          <text x="60" y="65" class="svg-text-bold" fill="var(--s2)">EPHEMERAL — gone on power loss</text>
+          <text x="60" y="92" class="svg-text" fill="var(--ink)">Registers · L1 · L2 · L3 · DRAM</text>
+          <text x="60" y="118" class="svg-text-muted">fast, volatile, holds working state for one process or boot session</text>
+
+          <line x1="40" y1="148" x2="600" y2="148" stroke="var(--accent)" stroke-width="2" stroke-dasharray="6 4" />
+          <text x="320" y="165" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">— power-loss boundary —</text>
+
+          <rect x="40" y="180" width="560" height="80" rx="6" fill="var(--s3)" opacity="0.15" stroke="var(--s3)" stroke-width="1" />
+          <text x="60" y="205" class="svg-text-bold" fill="var(--s3)">PERSISTENT — survives reboots, crashes, failures</text>
+          <text x="60" y="230" class="svg-text" fill="var(--ink)">SSD · HDD · network storage · tape</text>
+          <text x="60" y="252" class="svg-text-muted">slower, non-volatile, the only place "data" really lives</text>
+        </svg>
+        <p class="figure-caption">
+          Everything above the line is a copy. The truth — the persistent state of a system — is whatever lives below
+          the <a class="glink" href="../glossary.html#volatility-line">volatility line</a> at the moment the power dies.
+          Designs that confuse this are the ones that lose data on outages.
+        </p>
+      </div>
+
+      <h3>What "ephemeral" actually means</h3>
+
+      <p>
+        An in-memory cache, a session table in RAM, a Redis instance without
+        <a class="glink" href="../glossary.html#aof">AOF</a>, a Kubernetes pod's local disk in some setups — all
+        ephemeral. Useful, fast, and conditionally truthful. They're conceptually <em>derived</em> from persistent state
+        and rebuildable if lost. If your system can't rebuild them, they aren't ephemeral; they're a data-loss bug
+        waiting for an outage.
+      </p>
+
+      <h3>What "persistent" actually buys</h3>
+
+      <p>
+        SSDs and HDDs hold their bits without power because they store them as physical state — trapped charge in a flash
+        cell, magnetic polarity on a disk surface. That's why writes to them have to <em>reach the medium</em> before
+        they're durable. <a class="glink" href="../glossary.html#fsync"><code>fsync</code></a> exists because the OS, by
+        default, lies to you: a write returns "done" when it hits a buffer, not when it hits the platter. Every database
+        that calls itself durable is really a careful conversation with that lie.
+      </p>
+
+      <div class="callout">
+        <div class="callout-label">The expensive lesson</div>
+        Every "we lost data when the box rebooted" incident is a misplaced piece of state that lived above the
+        volatility line when the team thought it lived below. Always ask: if power dies right now, what does this system
+        have?
+      </div>
+
+      <h2 id="takeaway"><span class="num">07</span>The one-line takeaway</h2>
+
+      <p class="pullquote">
+        The memory hierarchy is the trade-off between speed, size, and cost made physical. Every performance decision is
+        really a question of which tier you're spending on.
+      </p>
+
+      <p>
+        The hierarchy isn't a list of components — it's a vocabulary. "This is hot, keep it in L2." "That's the working
+        set; fit it in DRAM or accept the page-cache miss." "This must survive a crash; it has to land on disk before we
+        ack." The same conversation, at every layer of every system you'll ever build. Once the pyramid is in your head,
+        all those decisions become the same shape.
+      </p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#sram">SRAM</a><a href="../glossary.html#dram">DRAM</a><a href="../glossary.html#ddr5">DDR5</a><a href="../glossary.html#hbm">HBM</a><a href="../glossary.html#cache-line">cache line</a><a href="../glossary.html#coherence">coherence</a><a href="../glossary.html#mesi">MESI</a><a href="../glossary.html#false-sharing">false sharing</a><a href="../glossary.html#fsync">fsync</a><a href="../glossary.html#aof">AOF</a><a href="../glossary.html#volatility-line">volatility line</a><a href="../glossary.html#working-set">working set</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="cache-locality.html">
+              <span class="related-arrow">→</span>
+              <span>Cache Locality &amp; Branch Prediction</span>
+              <span class="related-summary">— how to actually use the speed limits this page sets.</span>
+            </a>
+          </li>
+          <li>
+            <a href="hardware-pressure.html">
+              <span class="related-arrow">→</span>
+              <span>Hardware Pressure</span>
+              <span class="related-summary">— which tier each kind of workload pressures.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../execution/process-vs-thread.html">
+              <span class="related-arrow">→</span>
+              <span>Process vs Thread</span>
+              <span class="related-summary">— the PCB lives in DRAM; SMT exists to avoid that round-trip.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Hardware. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Process vs Thread — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Execution model</a></div>
+        <h1>Process vs <em>thread</em></h1>
+        <p class="deck">A process is the OS's unit of isolation. A thread is the OS's unit of execution. Most "should I use threads or processes?" questions are really about which kind of safety you can give up.</p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Execution model</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#question">Why ask</a></li>
+          <li><a href="#process">What a process is</a></li>
+          <li><a href="#thread">What a thread is</a></li>
+          <li><a href="#core-vs-thread">Core vs thread (the terminology collision)</a></li>
+          <li><a href="#diff">The five differences that matter</a></li>
+          <li><a href="#cost">Creation cost &amp; the COW trick</a></li>
+          <li><a href="#picking">Picking one</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">When a program runs, the operating system has to track two different things about it: what memory it's allowed to touch, and where in the code it currently is. The first is a <em>process</em> — a sealed box of memory, file descriptors, and permissions. The second is a <em>thread</em> — a position in code, with a stack and a register set, executing instructions. Every running program has at least one of each. The interesting question is what happens when you add more.</p>
+
+      <p>This page is about the difference between adding another process and adding another thread — what they each cost, what they each protect you from, and why most "use threads or processes?" arguments are really arguments about isolation versus speed.</p>
+
+      <h2 id="question"><span class="num">01</span>Why ask</h2>
+
+      <p>"Process" and "thread" get used interchangeably in casual speech and they shouldn't be. They're the OS's two different answers to two different questions:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>"Whose memory is this?"</h4>
+          <p>The OS answers with a <strong>process</strong>. Each process has its own private address space — a piece of virtual memory the kernel guarantees no one else can read or write. Crash one process, the others keep running. That isolation is what a process buys you.</p>
+        </div>
+        <div class="card">
+          <h4>"What is the CPU doing right now?"</h4>
+          <p>The OS answers with a <strong>thread</strong>. A thread is a sequence of instructions being executed, with its own stack and register state. A process needs at least one thread (otherwise nothing's running); it can have many.</p>
+        </div>
+      </div>
+
+      <p>Threads live <em>inside</em> processes. A process with one thread is a single sequential program. A process with eight threads is eight cursors moving through code at the same time, all reading and writing the same memory. That's where the speed comes from — and that's where the danger comes from.</p>
+
+      <h2 id="process"><span class="num">02</span>What a process is</h2>
+
+      <p>A process is everything the OS needs to keep one running program separated from every other running program. When you launch <code>chrome</code> and <code>postgres</code> on the same machine, the OS is the thing keeping their bytes apart.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — Anatomy of a process</div>
+        <svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="40" width="560" height="280" rx="8" fill="none" stroke="var(--s1)" stroke-width="1.5" />
+          <text x="60" y="62" class="svg-text-bold" fill="var(--s1)">PROCESS — its own address space</text>
+
+          <rect x="60" y="80" width="240" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <text x="180" y="105" text-anchor="middle" class="svg-text-bold" fill="var(--ink)">Code (.text)</text>
+          <text x="180" y="125" text-anchor="middle" class="svg-text-muted">the program's instructions, read-only</text>
+
+          <rect x="320" y="80" width="260" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <text x="450" y="105" text-anchor="middle" class="svg-text-bold" fill="var(--ink)">Data &amp; heap</text>
+          <text x="450" y="125" text-anchor="middle" class="svg-text-muted">globals, malloc'd objects, growable</text>
+
+          <rect x="60" y="160" width="240" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <text x="180" y="185" text-anchor="middle" class="svg-text-bold" fill="var(--ink)">Open files / sockets</text>
+          <text x="180" y="205" text-anchor="middle" class="svg-text-muted">file descriptors, network handles</text>
+
+          <rect x="320" y="160" width="260" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <text x="450" y="185" text-anchor="middle" class="svg-text-bold" fill="var(--ink)">Permissions, env, PID</text>
+          <text x="450" y="205" text-anchor="middle" class="svg-text-muted">user, working dir, env vars, process ID</text>
+
+          <rect x="60" y="240" width="520" height="60" rx="4" fill="var(--s2-soft)" stroke="var(--s2)" />
+          <text x="320" y="265" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">At least one thread (the "main thread")</text>
+          <text x="320" y="285" text-anchor="middle" class="svg-text-muted">a process with zero threads is just a piece of paper — nothing executes</text>
+        </svg>
+        <p class="figure-caption">A process owns its memory and its OS-level resources. The kernel uses page tables to enforce that one process can't read another's address space — try and you get <code>SIGSEGV</code>. Inside the process, at least one thread is what actually runs the code.</p>
+      </div>
+
+      <p>Three properties of a process are load-bearing:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Isolation.</strong> Memory and resource permissions are enforced by the OS. A bug in one process can't corrupt another's memory.</li>
+        <li><strong>A separate "view" of the world.</strong> Each process has its own file descriptor table, its own current working directory, its own environment variables. Two processes both opening "file 5" are looking at different files.</li>
+        <li><strong>One execution context required.</strong> A process is conceptually a container; it needs at least one thread to actually do anything.</li>
+      </ul>
+
+      <p>Two processes that need to talk to each other have to use <strong><a class="glink" href="../glossary.html#ipc">inter-process communication (IPC)</a></strong> — pipes, sockets, shared memory regions, message queues. The data has to leave one address space and re-enter another. That's slower than two threads sharing a pointer, and it's the whole point.</p>
+
+      <h2 id="thread"><span class="num">03</span>What a thread is</h2>
+
+      <p>A thread is a single thread of execution — one cursor moving through one program's code. It owns very little, but what it owns is precious: a <strong>stack</strong> (its function calls and local variables), a set of <strong>registers</strong> (the values the CPU is currently working on), a <strong>program counter</strong> — a special register that's literally a "you are here" pointer to the next instruction — and some scheduling metadata. Everything else — the heap, globals, open files — it shares with every other thread in the same process.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Threads inside one process</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="20" width="560" height="280" rx="8" fill="none" stroke="var(--s1)" stroke-width="1.5" />
+          <text x="60" y="42" class="svg-text-bold" fill="var(--s1)">ONE PROCESS</text>
+
+          <rect x="60" y="60" width="520" height="50" rx="4" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <text x="320" y="82" text-anchor="middle" class="svg-text-bold" fill="var(--ink)">Heap · globals · open files · permissions</text>
+          <text x="320" y="100" text-anchor="middle" class="svg-text-muted">SHARED across all threads — same pointer, same byte</text>
+
+          <rect x="80" y="140" width="120" height="140" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="140" y="162" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Thread A</text>
+          <text x="140" y="195" text-anchor="middle" class="svg-text" fill="var(--ink)">stack</text>
+          <text x="140" y="215" text-anchor="middle" class="svg-text" fill="var(--ink)">registers</text>
+          <text x="140" y="235" text-anchor="middle" class="svg-text" fill="var(--ink)">PC</text>
+          <text x="140" y="270" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="220" y="140" width="120" height="140" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="280" y="162" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Thread B</text>
+          <text x="280" y="195" text-anchor="middle" class="svg-text" fill="var(--ink)">stack</text>
+          <text x="280" y="215" text-anchor="middle" class="svg-text" fill="var(--ink)">registers</text>
+          <text x="280" y="235" text-anchor="middle" class="svg-text" fill="var(--ink)">PC</text>
+          <text x="280" y="270" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="360" y="140" width="120" height="140" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="420" y="162" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Thread C</text>
+          <text x="420" y="195" text-anchor="middle" class="svg-text" fill="var(--ink)">stack</text>
+          <text x="420" y="215" text-anchor="middle" class="svg-text" fill="var(--ink)">registers</text>
+          <text x="420" y="235" text-anchor="middle" class="svg-text" fill="var(--ink)">PC</text>
+          <text x="420" y="270" text-anchor="middle" class="svg-text-muted">private</text>
+
+          <rect x="500" y="140" width="80" height="140" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="540" y="162" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">...</text>
+          <text x="540" y="220" text-anchor="middle" class="svg-text-muted">N more</text>
+        </svg>
+        <p class="figure-caption">Every thread has its own stack (function calls, locals) and its own registers (where it is in code). Everything else — the heap, globals, open files — lives in the process and is shared. Pass a pointer between threads and they're both pointing at the same byte.</p>
+      </div>
+
+      <p>The shared heap is the source of every advantage and every problem of threading. Two threads can communicate by writing to the same variable — no IPC, no copying, just memory. That's astonishingly fast. It's also the source of <strong><a class="glink" href="../glossary.html#race-condition">race conditions</a></strong>: if both threads write at the same moment with no coordination, the result is undefined. Locks, atomics, channels, and concurrent data structures all exist to manage this hazard. The hazard isn't an edge case; it's the central engineering tax of threads.</p>
+
+      <div class="callout">
+        <div class="callout-label">Why "threads share, processes don't"</div>
+        Threads share the heap because they live in the same address space. Processes don't share the heap because their address spaces are different — process A's pointer <code>0x7fff1234</code> and process B's pointer <code>0x7fff1234</code> resolve to two different physical pages. The OS deliberately built it that way. Threads are an opt-in to give up that protection for speed.
+      </div>
+
+      <h3>Where the state lives when paused</h3>
+
+      <p>The figure above shows each thread's "private kit" as a tidy box. Where does that box <em>actually</em> live in the machine? The answer is split, and the split is where the cost of threading comes from.</p>
+
+      <p>While a thread is running, its private kit lives where it has to: in the core's <strong>register file</strong>. Registers are the fastest storage on the machine — sub-nanosecond access — but they're tiny (a few hundred bytes) and there's exactly one set per core. The register file holds one thread's state at a time; it has no room for two.</p>
+
+      <p>That raises an obvious question. If one core has one register file, but a system has dozens of OS threads, what happens to the ones that aren't currently running? Their state has to be saved somewhere the registers can be reloaded from later. The OS keeps that snapshot in the <strong><a class="glink" href="../glossary.html#pcb">Process Control Block (PCB)</a></strong> — a per-thread struct in RAM that holds the thread's saved registers, program counter, stack pointer, and scheduling state until the thread runs again. Every paused thread has a PCB sitting in kernel memory waiting for it.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 03 — Save / restore: the irreducible direct cost</div>
+        <svg viewBox="0 0 640 340" xmlns="http://www.w3.org/2000/svg">
+          <rect x="60" y="40" width="520" height="90" rx="6" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="1.2" />
+          <text x="320" y="62" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">CPU core · register file (one slot per core)</text>
+          <rect x="80" y="78" width="480" height="38" fill="var(--s2)" opacity="0.85" />
+          <text x="320" y="103" text-anchor="middle" class="svg-text-bold" fill="white">currently holds: Thread A → Thread B</text>
+
+          <path d="M 160 138 L 160 198" stroke="var(--accent)" stroke-width="2" marker-end="url(#arr-down-pcb)" />
+          <text x="195" y="170" class="svg-text-bold" fill="var(--accent)">save A</text>
+          <text x="195" y="186" class="svg-text-muted">copy regs → PCB-A</text>
+
+          <path d="M 480 198 L 480 138" stroke="var(--s2)" stroke-width="2" marker-end="url(#arr-up-pcb)" />
+          <text x="445" y="170" text-anchor="end" class="svg-text-bold" fill="var(--s2)">load B</text>
+          <text x="445" y="186" text-anchor="end" class="svg-text-muted">copy PCB-B → regs</text>
+
+          <rect x="60" y="210" width="520" height="110" rx="6" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="1.2" />
+          <text x="320" y="232" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">RAM — Process Control Blocks for paused threads</text>
+
+          <rect x="100" y="248" width="120" height="58" fill="var(--s2)" opacity="0.55" />
+          <text x="160" y="270" text-anchor="middle" class="svg-text-bold" fill="white">PCB-A</text>
+          <text x="160" y="288" text-anchor="middle" class="svg-text" fill="white">A's regs, paused</text>
+
+          <rect x="260" y="248" width="120" height="58" fill="var(--rule)" />
+          <text x="320" y="270" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">PCB-X</text>
+          <text x="320" y="288" text-anchor="middle" class="svg-text-muted">other paused thread</text>
+
+          <rect x="420" y="248" width="120" height="58" fill="var(--s2)" opacity="0.55" />
+          <text x="480" y="270" text-anchor="middle" class="svg-text-bold" fill="white">PCB-B</text>
+          <text x="480" y="288" text-anchor="middle" class="svg-text" fill="white">B's regs, about to load</text>
+
+          <defs>
+            <marker id="arr-down-pcb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+            </marker>
+            <marker id="arr-up-pcb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--s2)" />
+            </marker>
+          </defs>
+        </svg>
+        <p class="figure-caption">A context switch swaps Thread A out and Thread B in by saving A's registers down into PCB-A and loading PCB-B up into the registers. Each side of the swap is a CPU↔RAM round-trip — registers at ~0.3 ns, RAM at ~80 ns, two orders of magnitude apart. That gap is the irreducible direct cost of a context switch. Cold caches and TLB misses pile on after the switch — see <a href="context-switching.html">context switching</a> for the full bill.</p>
+      </div>
+
+      <p>The takeaway: a thread's "private kit" is conceptually private but physically split. While running, it's in registers. While paused, it's in a PCB in RAM. The OS spends real cycles moving state between the two on every scheduling decision — and the further apart the two locations are on the <a href="../hardware/memory-hierarchy.html">memory hierarchy</a>, the more those cycles cost.</p>
+
+      <div class="callout">
+        <div class="callout-label">Race conditions don't go away with parallelism</div>
+        Hyper-threading and multi-core make threads <em>more</em> physically simultaneous, not less — two threads can write to the same shared variable on the same nanosecond. Locks and atomics aren't there to slow the CPU down; they're there because the contention is over <em>data</em>, and data races exist whether the threads are interleaved on one core or running truly in parallel on two. The hazard is in the heap, not in the schedule.
+      </div>
+
+      <h2 id="core-vs-thread"><span class="num">04</span>Core vs thread (the terminology collision)</h2>
+
+      <p>One catch worth flagging before going further: the word "thread" is overloaded. The OS thread we just described is the software unit — a cursor through code that the kernel schedules. But your CPU also has things it calls <em>threads</em>, and they're a completely different idea. Conflating the two is one of the most common sources of confusion in performance and capacity-planning conversations.</p>
+
+      <h3>Cores are the hardware</h3>
+
+      <p>A modern CPU socket contains multiple <strong>physical cores</strong>. Each core is a complete execution engine: its own arithmetic units (ALU, FPU), its own L1 and L2 caches, its own branch predictor, its own register file, its own instruction front-end. One core can run one stream of instructions at full speed. Cores are silicon — adding more requires buying a different chip.</p>
+
+      <h3>Hardware threads — same core, second register file</h3>
+
+      <p>Most modern server CPUs (every Intel since the early 2000s, every AMD Zen) implement <strong><a class="glink" href="../glossary.html#smt">simultaneous multi-threading (SMT)</a></strong> — Intel brands it <em>Hyper-Threading</em>. Each physical core is augmented with a second (sometimes fourth) <strong>hardware thread</strong>: an extra register file and program counter, but no extra ALUs, caches, or front-end. The core can hold two execution contexts at once and pick which one to issue from on every clock cycle.</p>
+
+      <p>Why? Because real instructions stall. A cache miss, a branch mispredict, a dependency wait — the core would otherwise sit idle for those cycles. With two hardware threads, when one is stalled the core issues from the other. The execution units stay busy; the core's effective throughput rises ~20–40% on most workloads, at the cost of a small bump in die area.</p>
+
+      <p>There's a sharper way to read SMT: <strong>it's a hardware shortcut around the OS context switch</strong>. When the kernel switches between two OS threads on a single-register-file core, both threads have to round-trip through RAM via the PCB (Figure 03). With two hardware threads, both contexts are <em>already on-chip</em> — the core flips between them in a single cycle, no save, no load, no kernel involvement. SMT in one sentence: <em>duplicate the register file so the second context never has to leave the chip</em>.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 04 — One physical core, two hardware threads</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="20" width="560" height="280" rx="8" fill="none" stroke="var(--s1)" stroke-width="1.5" />
+          <text x="60" y="42" class="svg-text-bold" fill="var(--s1)">ONE PHYSICAL CORE</text>
+
+          <rect x="60" y="60" width="240" height="80" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="180" y="82" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Hardware thread 0</text>
+          <text x="180" y="105" text-anchor="middle" class="svg-text" fill="var(--ink)">PC · register file</text>
+          <text x="180" y="125" text-anchor="middle" class="svg-text-muted">private to this HT</text>
+
+          <rect x="340" y="60" width="240" height="80" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="460" y="82" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Hardware thread 1</text>
+          <text x="460" y="105" text-anchor="middle" class="svg-text" fill="var(--ink)">PC · register file</text>
+          <text x="460" y="125" text-anchor="middle" class="svg-text-muted">private to this HT</text>
+
+          <rect x="60" y="160" width="520" height="120" rx="6" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="1.2" />
+          <text x="320" y="184" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">SHARED across HTs on this core</text>
+
+          <text x="320" y="210" text-anchor="middle" class="svg-text" fill="var(--ink)">execution units (ALU · FPU · vector units)</text>
+          <text x="320" y="230" text-anchor="middle" class="svg-text" fill="var(--ink)">L1 instruction cache · L1 data cache · L2 cache</text>
+          <text x="320" y="250" text-anchor="middle" class="svg-text" fill="var(--ink)">branch predictor · front-end · TLB</text>
+
+          <text x="320" y="270" text-anchor="middle" class="svg-text-muted">two contexts in flight; core picks instructions from whichever isn't stalled</text>
+        </svg>
+        <p class="figure-caption">A single physical core with 2-way SMT. Each hardware thread has its own program counter and register file — that's enough to hold an entire execution context. Everything else — execution units, L1, L2, branch predictor, TLB — is shared. The core picks instructions from whichever HT can make progress that cycle.</p>
+      </div>
+
+      <h3>What the OS sees</h3>
+
+      <p>The OS sees hardware threads as <strong>logical CPUs</strong> — the slots it can schedule OS threads onto. A box with 8 physical cores and 2-way SMT presents 16 logical CPUs to Linux. <code>lscpu</code> makes the topology explicit:</p>
+
+      <div class="codeblock">$ lscpu
+CPU(s):              16    # logical CPUs (HT slots)
+Thread(s) per core:  2     # SMT degree
+Core(s) per socket:  8     # physical cores per socket
+Socket(s):           1</div>
+
+      <p>When you launch an OS thread, the kernel scheduler picks one of those 16 logical CPUs and runs your code there. Migration moves the thread from one logical CPU to another (often a different physical core). The OS thread is the unit you control; the logical CPU is where it ends up running.</p>
+
+      <h3>Why the distinction matters</h3>
+
+      <p>Two HT siblings on the same physical core are <strong>not two independent cores</strong>. They share execution resources. For pure CPU-bound work that fully uses the execution units, two threads on the same core get only ~1.2–1.4× the throughput of one — not 2× — because they're competing for the same ALUs. This shows up in three places:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Capacity planning.</strong> A "16-thread" CPU can run 16 OS threads concurrently, but its peak throughput is closer to 8 cores' worth, not 16. Marketing numbers count HTs; performance models should count physical cores.</li>
+        <li><strong>Latency-critical pinning.</strong> If you pin a hot thread to a physical core, also reserve (or pin away) its HT sibling — otherwise a noisy neighbour will compete for the core's execution units and your tail latency will spike. See <a href="core-pinning.html">core pinning</a>.</li>
+        <li><strong>Security.</strong> The shared L1 between HT siblings is the channel side-channel attacks like L1TF and MDS exploit. Sensitive workloads (cryptography, multi-tenant clouds) sometimes disable HT entirely for that reason.</li>
+      </ul>
+
+      <h3>One word, three things</h3>
+
+      <p>To finish untangling: when someone says "thread," they probably mean one of three things, and asking <em>which one</em> resolves nine out of ten arguments before they start.</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Term</th>
+            <th>What it actually is</th>
+            <th>Bound by</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Physical core</td>
+            <td>Independent execution engine — its own ALU, L1, branch predictor</td>
+            <td>Silicon: how many cores the chip has</td>
+          </tr>
+          <tr>
+            <td>Hardware thread (SMT/HT)</td>
+            <td>Per-core execution slot — its own register file + PC, shared everything else</td>
+            <td>Chip topology — usually 1× or 2× physical cores</td>
+          </tr>
+          <tr>
+            <td>OS thread (software thread)</td>
+            <td>Execution cursor scheduled by the kernel onto a logical CPU</td>
+            <td>RAM and scheduling overhead — practically tens of thousands per box</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The OS thread is software; the hardware thread and core are physical. Adding OS threads is cheap. Adding hardware threads or cores requires buying different silicon.</p>
+
+      <div class="callout">
+        <div class="callout-label">A useful sentence to internalize</div>
+        "We have 16 threads" almost always means 16 hardware-thread slots (8 cores × 2-way SMT). "We're running 16 threads" almost always means 16 OS threads. The first is a fact about the chip; the second is a fact about the program. They should never be in the same sentence without disambiguation.
+      </div>
+
+      <h2 id="diff"><span class="num">05</span>The five differences that matter</h2>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>Process</th>
+            <th>Thread</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Address space</td>
+            <td>Private, isolated</td>
+            <td>Shared with siblings</td>
+          </tr>
+          <tr>
+            <td>Communication</td>
+            <td>IPC: pipes, sockets, shm, queues</td>
+            <td>Shared variables (need locks)</td>
+          </tr>
+          <tr>
+            <td>Crash blast radius</td>
+            <td>One process; others survive</td>
+            <td>Whole process; all threads die</td>
+          </tr>
+          <tr>
+            <td>Creation cost</td>
+            <td class="mono">~0.5–5 ms (fork on Linux)</td>
+            <td class="mono">~10–100 µs</td>
+          </tr>
+          <tr>
+            <td>Context-switch cost</td>
+            <td>Higher — TLB flush, full state swap</td>
+            <td>Lower — same address space, no TLB flush</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>The shape of every choice falls out of these five rows. Threads are cheaper, faster, and tightly-coupled — perfect for sharing data and worst at containing failures. Processes are more expensive, more isolated, and harder to coordinate — perfect for safety boundaries and worst at high-frequency communication.</p>
+
+      <h2 id="cost"><span class="num">06</span>Creation cost &amp; the COW trick</h2>
+
+      <p>"Processes are expensive to create" used to be a hard rule. On modern Linux it's softer, because of a clever trick called <strong><a class="glink" href="../glossary.html#cow">copy-on-write</a></strong>.</p>
+
+      <p>When a process calls <code>fork()</code>, the child gets a copy of the parent's address space. Naively, that means duplicating gigabytes of memory — slow and wasteful. Linux instead marks every page as shared and read-only; the child and parent point to the same physical pages. Only when one of them <em>writes</em> to a page does the kernel actually duplicate it. If the child immediately calls <code>exec()</code> to replace its memory with a new program (the typical "fork-exec" pattern), the duplicates were never made.</p>
+
+      <p>Threads skip even that overhead. Creating a thread is essentially: allocate an 8 KB stack, set up a register frame, add an entry to the scheduler queue. Tens of microseconds, not milliseconds. Modern languages add their own layer on top — <a class="glink" href="../glossary.html#green-thread">green threads, fibers, goroutines, Java virtual threads</a> — that compress thread cost further into the nanoseconds-to-microseconds range by multiplexing many language-level threads onto fewer OS threads.</p>
+
+      <div class="callout">
+        <div class="callout-label">Lightweight threads ≠ free</div>
+        Goroutines, virtual threads, and fibers cost less than OS threads but they're not free. They still need stacks, scheduling, and synchronization. The win isn't "threads cost zero" — it's "threads cost little enough that you can have a million of them and let the runtime sort it out."
+      </div>
+
+      <h2 id="picking"><span class="num">07</span>Picking one</h2>
+
+      <p>The decision tree, in order of priority:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Pick processes when…</h4>
+          <p>You need <strong>isolation</strong>. A crash in component A must not bring down component B. Browser tabs (Chrome's per-tab process), database connection workers (Postgres), serverless function invocations, and anything running untrusted code all default to processes for this reason.</p>
+        </div>
+        <div class="card">
+          <h4>Pick threads when…</h4>
+          <p>You need <strong>cheap shared state</strong>. Workers all reading the same in-memory cache, a thread pool processing items off the same queue, a request handler offloading work to a parallel computation. Threads' headline feature is that the data doesn't have to move.</p>
+        </div>
+        <div class="card">
+          <h4>Pick processes when…</h4>
+          <p>Your runtime has a <strong><a class="glink" href="../glossary.html#gil">Global Interpreter Lock</a></strong>. Python's GIL serializes Python bytecode across threads, so for CPU-bound work the only way to use multiple cores is multiple processes (<code>multiprocessing</code>). Threads still help for I/O-bound work because the GIL releases on syscalls.</p>
+        </div>
+        <div class="card">
+          <h4>Pick threads when…</h4>
+          <p>The work is <strong>I/O-bound and the runtime supports it cheaply</strong>. Java virtual threads, Go goroutines, Erlang processes (which are misleadingly named — they're more like green threads). Tens of thousands of them can wait on I/O with negligible overhead.</p>
+        </div>
+      </div>
+
+      <p>The historical context helps: web servers used to spawn one process per request (CGI), then one thread per request, then a fixed thread pool, then async / event-loop models running on a single thread. Each step traded isolation for throughput because the per-unit cost was the bottleneck. The pendulum swings; the trade-off doesn't.</p>
+
+      <p class="pullquote">Threads share by default and isolate by effort. Processes isolate by default and share by effort. The "right" choice is whichever default matches the failure mode you're most afraid of.</p>
+
+      <h2 id="takeaway"><span class="num">08</span>The one-line takeaway</h2>
+
+      <p>A process is a memory boundary; a thread is an execution cursor. You add a process when you want safety. You add a thread when you want speed. Most production systems use both — processes for the architecture (one per service, one per tab, one per worker pool) and threads for the parallelism inside each one.</p>
+
+      <p>One last subtlety: more threads or more processes does not automatically mean more parallel execution. That requires multiple cores and a kind of work that can be split. Concurrency (the <em>structure</em> of having multiple things in flight) and parallelism (the <em>execution</em> of multiple things simultaneously) are different ideas, and they're worth their own page — see <a href="concurrency-vs-parallelism.html">concurrency vs parallelism</a>.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#ipc">IPC</a><a href="../glossary.html#race-condition">race condition</a><a href="../glossary.html#pcb">PCB</a><a href="../glossary.html#smt">SMT</a><a href="../glossary.html#cow">copy-on-write</a><a href="../glossary.html#gil">GIL</a><a href="../glossary.html#green-thread">green thread</a><a href="../glossary.html#tlb">TLB</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="concurrency-vs-parallelism.html">
+              <span class="related-arrow">→</span>
+              <span>Concurrency vs Parallelism</span>
+              <span class="related-summary">— the conceptual model behind "more threads."</span>
+            </a>
+          </li>
+          <li>
+            <a href="context-switching.html">
+              <span class="related-arrow">→</span>
+              <span>Context Switching</span>
+              <span class="related-summary">— what the PCB round-trip actually costs.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../hardware/memory-hierarchy.html">
+              <span class="related-arrow">→</span>
+              <span>Memory Hierarchy</span>
+              <span class="related-summary">— why register-vs-RAM is the gap that makes context switches expensive.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Execution model. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

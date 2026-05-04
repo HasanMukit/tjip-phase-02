@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Resilience Patterns — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Reliability</a></div>
+        <h1>Resilience <em>patterns</em></h1>
+        <p class="deck">The performance numbers describe the happy path. These patterns are how systems stay on it when networks blip, downstreams slow down, and timers conspire.</p>
+        <div class="meta">
+          <span class="class-pill">Class 03</span>
+          <span>Theme · Reliability</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#setting">When the happy-path numbers lie</a></li>
+          <li><a href="#retries">Retry safely — storm, capping, backoff, jitter, Retry-After</a></li>
+          <li><a href="#breaker">The circuit breaker</a></li>
+          <li><a href="#gateway">The gateway — bulkheads and throttling</a></li>
+          <li><a href="#stampede">Cache stampede &amp; thundering herd</a></li>
+          <li><a href="#sync">Synchronization spikes &amp; coordinated events</a></li>
+          <li><a href="#graceful">Graceful degradation</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">Every page so far has assumed the happy path: requests arrive, latency is bounded, throughput is steady. Real systems run on flaky networks, restarting processes, full disks, and timing-out databases. Most of the engineering work in production isn't making the happy path faster — it's keeping the system upright when something downstream breaks. The patterns on this page are how that's done: a small vocabulary of techniques that, together, separate "a service that handles 100 K RPS in benchmarks" from "a service that's still standing on Tuesday morning."</p>
+
+      <p>Each pattern below is a response to a specific failure mode. Read them as a set — they compose. A retry without a circuit breaker amplifies failures. A circuit breaker without graceful degradation just turns slow errors into fast ones. A jitter strategy without throttling at the gateway is a band-aid. The whole stack is the answer.</p>
+
+      <h2 id="setting"><span class="num">01</span>When the happy-path numbers lie</h2>
+
+      <p>A <strong><a class="glink" href="../glossary.html#transient-failure">transient failure</a></strong> is one that succeeds if you try again, with no human intervention: a dropped TCP packet, a brief network partition, a process restarting, a leader re-election in progress. Permanent failures (a malformed request, a missing record, a 401) won't get better — but transient ones often will, and they're vastly more common than permanent ones in any networked system.</p>
+
+      <p>The whole resilience stack is built around this asymmetry. If you can detect transient-vs-permanent and respond appropriately, the system stays up through most of what infrastructure throws at it. If you treat them the same way — by retrying everything, or by giving up on everything — you get either a retry storm or a brittle system. Neither is acceptable in production.</p>
+
+      <div class="callout">
+        <div class="callout-label">Idempotency is a precondition, not a pattern</div>
+        Most patterns below assume the operation is <strong><a class="glink" href="../glossary.html#idempotency">idempotent</a></strong> — running it twice has the same effect as running it once. Reads are naturally idempotent; mutations need an explicit idempotency key (a UUID the client generates and the server dedupes by). Without idempotency, retries mean double-charges, duplicate emails, and corrupted state. Establish idempotency at the API boundary before reaching for any of the techniques below.
+      </div>
+
+      <h2 id="retries"><span class="num">02</span>Retry safely — storm, capping, backoff, jitter, Retry-After</h2>
+
+      <p>The naive instinct: a request failed, send it again. The problem: failure is often the signal that the downstream is already overloaded — and retrying is exactly the wrong response.</p>
+
+      <h3>The retry storm</h3>
+
+      <p>Imagine 10 K clients calling a service that just slowed down past its timeout. Every client times out and retries; some retry twice. The service now sees 20 K–30 K requests per second instead of 10 K — at the moment it could least handle them. Retries that succeed-eventually under light load become a self-inflicted denial of service under heavy load. The system has to reject more aggressively just to stay alive, and even then the downstream is still chasing its tail. This is the <strong><a class="glink" href="../glossary.html#retry-storm">retry storm</a></strong>, and it's responsible for a sobering fraction of real outages.</p>
+
+      <h3>Capping retries</h3>
+
+      <p>The first line of defense is to put hard limits on how often retries happen. Three knobs:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.7; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Max attempts.</strong> Typically 2 or 3 total. Past that, fail. More retries don't recover failures; they just hide them.</li>
+        <li><strong>Total deadline.</strong> Don't retry past the user's tolerance. If the call had a 1 s budget and 800 ms is gone, retrying an operation that takes 400 ms means the user sees a timeout anyway — better to fail now and let them retry the whole flow if they want.</li>
+        <li><strong><a class="glink" href="../glossary.html#retry-budget">Retry budget</a>.</strong> A fleet-wide cap: "retries cannot exceed 10% of base traffic." Implemented as a token bucket per client. Past the budget, retries are dropped immediately even if individual policies would allow them. This is what really stops storms.</li>
+      </ul>
+
+      <h3>Exponential backoff</h3>
+
+      <p>Each retry waits longer than the last: 100 ms, 200 ms, 400 ms, 800 ms. This gives the downstream room to recover and prevents busy-wait amplification. The doubling is canonical but not magic — any monotonic schedule with reasonable growth works. The point is not <em>busy</em>, not <em>fixed</em>, and not <em>infinite</em>.</p>
+
+      <h3>Jitter — the unsung hero</h3>
+
+      <p><a class="glink" href="../glossary.html#backoff">Backoff</a> alone leaves all clients synchronized. After a shared incident, every client retries at exactly +100 ms, then +300 ms, then +700 ms. The downstream sees pulses of load instead of a smooth recovery. The fix is to add randomness — <a class="glink" href="../glossary.html#jitter">jitter</a>:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Equal jitter</h4>
+          <p><code>delay = backoff/2 + random(0, backoff/2)</code>. Half of the backoff is fixed, half is random. Predictable lower bound; spread upper bound. Common default.</p>
+        </div>
+        <div class="card">
+          <h4>Full jitter</h4>
+          <p><code>delay = random(0, backoff)</code>. Maximum smoothing. Used when the cost of synchronized retries is severe (e.g., AWS recommends this for SDK retries). Some calls come back fast, some slow — but the herd is broken.</p>
+        </div>
+        <div class="card">
+          <h4>Decorrelated jitter</h4>
+          <p><code>delay = min(cap, random(base, prev × 3))</code>. Each delay is randomized relative to the previous one. Avoids the case where consecutive retries land in the same window.</p>
+        </div>
+        <div class="card">
+          <h4>No jitter (don't)</h4>
+          <p>Plain exponential backoff with no randomness. Common in code that hasn't seen a retry storm yet. The fix is one line and it's worth shipping before the first incident.</p>
+        </div>
+      </div>
+
+      <h3>Retry-After — the server's voice</h3>
+
+      <p>HTTP gives servers a way to tell clients exactly when to come back: the <strong><a class="glink" href="../glossary.html#retry-after">Retry-After</a></strong> header on 429 (Too Many Requests) and 503 (Service Unavailable) responses. The value is either a delay in seconds or an absolute date. Clients that respect it stop retrying until the server invites them back; servers that send it actively shape their own incoming load. This is the single best protocol-level retry primitive that exists, and it's underused.</p>
+
+      <h2 id="breaker"><span class="num">03</span>The circuit breaker</h2>
+
+      <p>A <strong><a class="glink" href="../glossary.html#circuit-breaker">circuit breaker</a></strong> wraps a remote call and tracks its failure rate. When failures cross a threshold, the breaker "opens" — subsequent calls fail immediately, without contacting the downstream at all. After a cooldown, it tries one trial request; if that succeeds, the breaker "closes" again. The pattern is named after household electrical breakers for the same reason: rather than melt, it disconnects.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — Circuit breaker as a three-state machine</div>
+        <svg viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="120" cy="130" r="60" fill="var(--s2)" opacity="0.85" />
+          <text x="120" y="125" text-anchor="middle" class="svg-text-bold" fill="white">CLOSED</text>
+          <text x="120" y="143" text-anchor="middle" class="svg-text" fill="white">normal</text>
+
+          <circle cx="320" cy="130" r="60" fill="var(--accent)" opacity="0.95" />
+          <text x="320" y="125" text-anchor="middle" class="svg-text-bold" fill="white">OPEN</text>
+          <text x="320" y="143" text-anchor="middle" class="svg-text" fill="white">fail fast</text>
+
+          <circle cx="520" cy="130" r="60" fill="var(--s3)" opacity="0.85" />
+          <text x="520" y="120" text-anchor="middle" class="svg-text-bold" fill="white">HALF-</text>
+          <text x="520" y="138" text-anchor="middle" class="svg-text-bold" fill="white">OPEN</text>
+          <text x="520" y="156" text-anchor="middle" class="svg-text" fill="white">probing</text>
+
+          <path d="M 180 115 Q 250 80 260 115" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#cb1)" />
+          <text x="220" y="78" text-anchor="middle" class="svg-text-muted">failure rate ≥ threshold</text>
+
+          <path d="M 380 115 Q 450 80 460 115" fill="none" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#cb1)" />
+          <text x="420" y="78" text-anchor="middle" class="svg-text-muted">cooldown elapsed</text>
+
+          <path d="M 460 175 Q 320 220 180 175" fill="none" stroke="var(--s2)" stroke-width="1.5" marker-end="url(#cb2)" />
+          <text x="320" y="225" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">probe succeeds → CLOSED</text>
+
+          <path d="M 460 145 Q 420 145 380 145" fill="none" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#cb3)" />
+          <text x="420" y="170" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">probe fails</text>
+
+          <defs>
+            <marker id="cb1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)" />
+            </marker>
+            <marker id="cb2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--s2)" />
+            </marker>
+            <marker id="cb3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+        </svg>
+        <p class="figure-caption">Three states. CLOSED is normal: traffic flows, failures are counted in a sliding window. When the failure ratio crosses the threshold (e.g., 50% over the last 100 calls), the breaker OPENS — calls return an error instantly without touching the downstream. After a cooldown the breaker enters HALF-OPEN: a single trial request flows. Success returns to CLOSED; failure returns to OPEN.</p>
+      </div>
+
+      <p>The threshold isn't binary. Real implementations use a sliding-window failure ratio (e.g., "open if &gt;50% of the last 100 calls failed"), with a minimum-volume gate ("don't trip on 1 of 2"). Good circuit breakers also propagate <code>Retry-After</code> hints from the downstream and emit events for dashboards. Hystrix popularized the pattern; Resilience4j, Polly, gobreaker are the modern incarnations.</p>
+
+      <div class="callout">
+        <div class="callout-label">Why fast failure helps everyone</div>
+        Without a breaker, every upstream caller waits the full timeout (often seconds) for a doomed call. Threads pile up. Connection pools fill. The upstream's own latency tail explodes. With a breaker, the same calls fail in microseconds; threads and pools stay drained; the upstream's tail stays bounded. The breaker is upstream protection at least as much as it's downstream protection.
+      </div>
+
+      <h2 id="gateway"><span class="num">04</span>The gateway — bulkheads and throttling</h2>
+
+      <p>The <strong>gateway</strong> is the front door of your service: an API gateway, an Envoy or nginx layer, an edge proxy. Every request passes through it before reaching your application code. That makes it the natural place for two patterns whose whole purpose is to enforce protection at the boundary, before traffic touches anything fragile.</p>
+
+      <p>The two patterns answer different questions, and confusing them is the most common reason this topic feels muddled:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#bulkhead">Bulkhead</a></h4>
+          <p>"If something downstream fails, how do I keep that failure from spreading to the rest of the system?" Bulkheads <em>contain</em> a breach that already happened.</p>
+        </div>
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#throttle">Throttle</a></h4>
+          <p>"How do I keep too much traffic from arriving in the first place?" Throttles <em>prevent</em> overload by saying no at the door.</p>
+        </div>
+      </div>
+
+      <p>One contains; the other prevents. You almost always want both — they are complementary, not alternatives.</p>
+
+      <h3>Bulkhead — partition resources so a failure stays in its lane</h3>
+
+      <p>The name comes from shipbuilding. A bulkhead is a watertight wall inside a ship's hull. If the hull is breached, one compartment floods, but the wall stops the water from spreading and the ship stays afloat. Without bulkheads, one hole sinks the whole vessel.</p>
+
+      <p>Services have the same problem. A typical service has <em>shared</em> resources — a single thread pool, a single connection pool, a single CPU budget — and every request, no matter what work it's doing, pulls from those same shared pools. Sharing is efficient when everything is healthy. It becomes catastrophic the moment one downstream slows down: every thread gets stuck waiting on the slow downstream, the queue fills with calls for <em>other</em> downstreams, and the entire service stops responding.</p>
+
+      <p>The bulkhead fix is to <em>partition</em> the shared resource. Give <code>payments</code> its own pool of, say, 100 threads, and <code>recommendations</code> its own pool of 100 threads. Now when <code>payments</code> slows, it can saturate at most its own 100 threads. The other 100 keep serving <code>recommendations</code>. The breach is contained to one compartment of the ship.</p>
+
+      <h3>Throttling — the hard cap at the door</h3>
+
+      <p>A throttle is a hard limit on incoming rate or concurrency, enforced at the gateway. Past the limit, requests are rejected immediately with <code>429 Too Many Requests</code> and a <code>Retry-After</code> header. The system never even attempts the work.</p>
+
+      <p>The instinct is "rejecting requests is bad — we should try to serve them." But once a system passes the knee of its capacity curve (see <a href="../performance/latency-throughput.html">latency &amp; throughput</a>), accepting more work doesn't get more <em>done</em> — it just makes everything slower for everyone, until the system collapses. Rejecting 1% at the door beats degrading 100% behind it.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#token-bucket">Token bucket</a></h4>
+          <p>A bucket holds up to N tokens and refills at rate R per second. Each request consumes one token; if the bucket is empty, the request is rejected. Allows bursts up to N, sustains R over time.</p>
+        </div>
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#leaky-bucket">Leaky bucket</a></h4>
+          <p>Requests enter a fixed-size queue and drain out at a constant rate. Output is perfectly smooth no matter how spiky the input.</p>
+        </div>
+        <div class="card">
+          <h4>Fixed / sliding window</h4>
+          <p>Count requests per N-second window — "max 100 per minute." Simple to implement and easy to explain to API customers.</p>
+        </div>
+        <div class="card">
+          <h4>Concurrency limiting</h4>
+          <p>Cap the number of <em>in-flight</em> requests, not the rate. Maps better to actual capacity than rate does — by Little's Law, in-flight = QPS × latency, so a rate cap protects you only if latency stays constant.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Bulkhead vs throttle — the one-line distinction</div>
+        The throttle decides <em>how much</em> traffic is allowed inside the system. The bulkhead decides <em>where that traffic is allowed to do damage</em> once it's in. Throttle keeps the door from being broken; bulkhead keeps a breach from spreading past one compartment. You install both because either alone leaves a failure mode the other would have caught.
+      </div>
+
+      <h2 id="stampede"><span class="num">05</span>Cache stampede &amp; thundering herd</h2>
+
+      <h3>Cache stampede</h3>
+
+      <p>A popular cache key expires. The next 10 K requests all see a cache miss simultaneously. Every one of them goes to the database. The database falls over. This is the <strong><a class="glink" href="../glossary.html#cache-stampede">cache stampede</a></strong> (sometimes called <em>dog-piling</em>).</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#single-flight">Single-flight / request coalescing</a></h4>
+          <p>Only one request goes to the database for a given key; the others block until its answer is ready, then read it. Implementations: Go's <code>singleflight</code>, Java's <code>CompletableFuture</code>-based memoizers.</p>
+        </div>
+        <div class="card">
+          <h4>Probabilistic early refresh</h4>
+          <p>Each read has a small chance of refreshing the cache <em>before</em> expiry, with the chance growing as expiry approaches. The cache gets refreshed once, by a "lucky" request, before the stampede window opens.</p>
+        </div>
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#stale-while-revalidate">Stale-while-revalidate</a></h4>
+          <p>Serve the stale value immediately while a single background task refreshes. No client ever waits for a cold rebuild; the cost of staleness is bounded to one refresh cycle.</p>
+        </div>
+        <div class="card">
+          <h4>TTL jitter</h4>
+          <p>Don't set TTLs to round numbers everyone shares. Add per-key randomness — <code>TTL = base + random(0, base × 0.1)</code> — so caches don't all expire on the same second.</p>
+        </div>
+      </div>
+
+      <h3>Thundering herd — the same idea, broader scope</h3>
+
+      <p>Cache stampede is a special case of a wider phenomenon: any event that wakes many clients at the same instant becomes a load spike. Server restarts, config pushes, leader re-elections, expiring tokens. The cure is the same as for cache stampede: <strong>jitter</strong>. Spread the wakeup across an interval. The herd is broken in the time domain rather than coordinated through it.</p>
+
+      <h2 id="sync"><span class="num">06</span>Synchronization spikes &amp; coordinated events</h2>
+
+      <h3>Desync periodic events</h3>
+
+      <p>The most insidious load spikes come from independent processes whose timers happen to align. Cron jobs at the top of the hour. Token refreshes that all expire at midnight. Health checks every 30 seconds, started at boot — and everyone boots at the same time after a deploy. Each timer alone is fine; aligned, they become a self-inflicted denial-of-service. The fix: when scheduling anything periodic, add jitter at startup.</p>
+
+      <h3>Coordination as another spike source — ZooKeeper election</h3>
+
+      <p>Some events are <em>inherently</em> coordinated. The clearest example: every node in a distributed system must agree on who the leader is. When the current leader dies, every other node finds out at roughly the same moment and rushes to choose a replacement — a guaranteed coordinated event. A naive implementation produces a thundering herd against the coordination service. So the protocol has to be designed to <em>not</em> wake everyone up at once.</p>
+
+      <p>ZooKeeper is the classic example of getting this right. A <a class="glink" href="../glossary.html#znode">znode</a> is one entry in ZooKeeper's filesystem-shaped tree. Two flags: <strong>ephemeral</strong> (auto-deleted when the client disconnects) and <strong>sequential</strong> (gets a globally-unique monotonic suffix). The third primitive is the <strong>watch</strong>: clients can ask "tell me when this specific znode changes."</p>
+
+      <p>The election: each candidate creates an ephemeral-sequential znode under <code>/election/</code>. The lowest sequence number wins. Each follower puts a watch on the znode <em>directly below its own</em> — not on the leader. When the leader dies, ZooKeeper auto-deletes its znode (because it was ephemeral), and <strong>exactly one watch fires</strong> — the next candidate in line. No herd. The chained-watch design guarantees that any single state change fires exactly one notification, no matter how many candidates are participating.</p>
+
+      <div class="callout">
+        <div class="callout-label">The lesson behind the recipe</div>
+        Even when N processes <em>must</em> coordinate, the protocol can be designed so that any state change fires exactly one notification instead of N. Anything that broadcasts to all N watchers on every change will bite you at scale. When choosing a coordination tool, ask first: "what happens when the watched thing changes — who gets woken up?"
+      </div>
+
+      <h2 id="graceful"><span class="num">07</span>Graceful degradation</h2>
+
+      <p>When the patterns above can't restore a broken downstream, the last lever is <strong><a class="glink" href="../glossary.html#graceful-degradation">graceful degradation</a></strong> — return a useful but degraded response instead of an error. The discipline is to design the fallback explicitly — not let it emerge by accident.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Fallbacks for missing data</h4>
+          <p>Recommendation service times out → return the global popular list. User profile fetch fails → render with placeholder name and avatar. Personalization service down → serve the unpersonalized version.</p>
+        </div>
+        <div class="card">
+          <h4>Feature degradation</h4>
+          <p>Pricing service unavailable → show "price unavailable" and disable the buy button instead of 500-erroring the whole page. Search index lagging → serve from a slightly older index with a "showing recent results" hint.</p>
+        </div>
+        <div class="card">
+          <h4>Batching as a degradation lever</h4>
+          <p>When a downstream is overloaded, batching pending requests trades latency for throughput. Five 100 ms requests that each fail under load might succeed as one 200 ms batched request.</p>
+        </div>
+        <div class="card">
+          <h4>Well-formed errors</h4>
+          <p>When you must return an error, do it well. Use the right status code (4xx for client, 5xx for server). Include a Retry-After when transient. Don't leak raw exception text. The error is a user experience, not a failure of imagination.</p>
+        </div>
+      </div>
+
+      <p>The test for any production endpoint is: <em>what does it return when its primary dependency is down?</em> If the answer is "500," the endpoint isn't done. The graceful path is part of the spec, and writing it forces you to decide which features are essential and which are decorative.</p>
+
+      <h2 id="takeaway"><span class="num">08</span>The one-line takeaway</h2>
+
+      <p class="pullquote">The performance numbers describe the happy path. The resilience patterns are how you stay on it.</p>
+
+      <p>Read the patterns as a stack. Idempotency is the precondition. Capped, jittered retries handle transient failures without amplifying them. Circuit breakers stop the amplification when retries aren't enough. Bulkheads keep the breach contained. Throttling shapes the door. Cache-stampede protections and jittered timers prevent self-inflicted spikes. Graceful degradation is the last lever when the system can't fully recover. None of these are exotic — they're the small, well-known moves that compose into a system that survives Tuesday morning.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#transient-failure">transient failure</a><a href="../glossary.html#idempotency">idempotency</a><a href="../glossary.html#retry-storm">retry storm</a><a href="../glossary.html#retry-budget">retry budget</a><a href="../glossary.html#backoff">backoff</a><a href="../glossary.html#jitter">jitter</a><a href="../glossary.html#retry-after">Retry-After</a><a href="../glossary.html#circuit-breaker">circuit breaker</a><a href="../glossary.html#bulkhead">bulkhead</a><a href="../glossary.html#throttle">throttle</a><a href="../glossary.html#token-bucket">token bucket</a><a href="../glossary.html#leaky-bucket">leaky bucket</a><a href="../glossary.html#cache-stampede">cache stampede</a><a href="../glossary.html#single-flight">single-flight</a><a href="../glossary.html#stale-while-revalidate">stale-while-revalidate</a><a href="../glossary.html#znode">znode</a><a href="../glossary.html#graceful-degradation">graceful degradation</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="../performance/latency-throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Latency &amp; Throughput</span>
+              <span class="related-summary">— the knee of the curve and Little's Law set the limits these patterns enforce.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../distribution/cap-theorem.html">
+              <span class="related-arrow">→</span>
+              <span>CAP Theorem</span>
+              <span class="related-summary">— circuit breakers are how clients handle CP refusals.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../craft/back-of-envelope.html">
+              <span class="related-arrow">→</span>
+              <span>Back-of-the-Envelope</span>
+              <span class="related-summary">— sizes the herd before it stampedes.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 03 · Reliability. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

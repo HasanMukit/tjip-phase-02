@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hardware — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="theme-page">
+      <header class="theme-header">
+        <div class="eyebrow">Theme 01 — Hardware</div>
+        <h1>What a request <em>costs</em>.</h1>
+        <p class="deck">
+          Before any architecture diagram, there's silicon underneath. CPU, RAM, disk, network — figure out which one
+          fills up first, and everything else is decoration.
+        </p>
+      </header>
+
+      <div class="topic-rows">
+        <a href="hardware-pressure.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Hardware Pressure</h3>
+            <p>"1M req/s" is meaningless until you say what one request costs. Four pressure points; five concrete request shapes.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="memory-hierarchy.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Memory Hierarchy</h3>
+            <p>Eight tiers from registers to tape. The speed/size/cost pyramid and the volatility line between RAM and disk.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="cache-locality.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Cache Locality &amp; Branch Prediction</h3>
+            <p>Cache lines, spatial vs temporal locality, the misprediction tax, and why "inefficient" sorts beat "better" ones below the crossover.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Theme 01 of 06. <a href="../execution/index.html" style="color: var(--accent)">Next: Execution model →</a>
+    </footer>
+  </body>
+</html>

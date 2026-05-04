@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Case Studies — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="index.html" class="active">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="theme-page">
+      <header class="theme-header">
+        <div class="eyebrow">Case Studies</div>
+        <h1>The patterns in <em>practice</em>.</h1>
+        <p class="deck">
+          Each class has a set of "scenario → what's happening → terms to know → hidden solution" walkthroughs that
+          exercise the topic pages. They're indexed here by class, with cross-links into the themes they touch.
+        </p>
+      </header>
+
+      <div class="topic-rows">
+        <a href="class-01.html" class="topic-row">
+          <span class="row-pill">Class 01</span>
+          <div class="row-body">
+            <h3>Hardware &amp; Execution Model — 12 cases</h3>
+            <p>Six on hardware (matrix loops, false sharing, sorted-array branch prediction), six on execution model (Gunicorn crash, hyperthread mis-counting, event-loop freeze, isolcpus tail).</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="class-02.html" class="topic-row">
+          <span class="row-pill">Class 02</span>
+          <div class="row-body">
+            <h3>Distribution — 7 cases</h3>
+            <p>Cache fleet resize, hot-shard skew, fintech split-brain, AP cart, R/W tuning, rolling upgrade, AZ failure.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="class-03.html" class="topic-row">
+          <span class="row-pill">Class 03</span>
+          <div class="row-body">
+            <h3>Performance &amp; Reliability — 8 cases</h3>
+            <p>Fan-out tail latency, payment budget, Kafka backlog, autoscaler thrash, ETL deadline, cold-cache spike, retry amplification, pool sized exactly to capacity.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Case-study pages are ported in milestone 5.
+    </footer>
+  </body>
+</html>

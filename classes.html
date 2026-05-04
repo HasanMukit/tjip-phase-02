@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TJIP Phase 02 — Classes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="index.html">Themes</a>
+          <a href="classes.html" class="active">Classes</a>
+          <a href="case-studies/index.html">Case Studies</a>
+          <a href="glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="hero-eyebrow">By Class</div>
+      <h1>What was covered <em>when</em>.</h1>
+      <p class="hero-deck">
+        The same topic pages, indexed by the class they were taught in. Useful for looking back at a session in the
+        order it actually happened.
+      </p>
+    </section>
+
+    <section class="classes-section">
+      <div class="section-title">Classes 01 — 03</div>
+
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">01</span>
+          <div class="class-info">
+            <div class="class-title">Hardware &amp; the Execution Model</div>
+            <div class="class-summary">
+              Two halves: what one request costs on real silicon, and the OS abstractions that schedule those cycles.
+              Lives across two themes — Hardware and Execution.
+            </div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <a class="topic-link" href="hardware/hardware-pressure.html"><span class="topic-status done"></span>Hardware Pressure</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="hardware/memory-hierarchy.html"><span class="topic-status done"></span>Memory Hierarchy</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="hardware/cache-locality.html"><span class="topic-status done"></span>Cache Locality &amp; Branch Prediction</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="execution/process-vs-thread.html"><span class="topic-status done"></span>Process vs Thread</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="execution/concurrency-vs-parallelism.html"><span class="topic-status done"></span>Concurrency vs Parallelism</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="execution/event-loop.html"><span class="topic-status done"></span>The Event Loop</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="execution/context-switching.html"><span class="topic-status done"></span>Context Switching</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="execution/core-pinning.html"><span class="topic-status done"></span>Core Pinning</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="case-studies/class-01.html"><span class="topic-status done"></span>Case Studies</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">02</span>
+          <div class="class-info">
+            <div class="class-title">Distributed Systems Fundamentals</div>
+            <div class="class-summary">
+              How data is distributed across machines and the trade-offs that forces. Lives in the Distribution theme.
+            </div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <a class="topic-link" href="distribution/consistent-hashing.html"><span class="topic-status done"></span>Consistent Hashing</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="distribution/cap-theorem.html"><span class="topic-status done"></span>CAP Theorem</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="case-studies/class-02.html"><span class="topic-status done"></span>Case Studies</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">03</span>
+          <div class="class-info">
+            <div class="class-title">Performance Fundamentals</div>
+            <div class="class-summary">
+              The vocabulary of fast systems plus the failure-mode patterns that keep the numbers honest. Lives across
+              Performance, Reliability, and Craft.
+            </div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <a class="topic-link" href="performance/latency.html"><span class="topic-status done"></span>Latency</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="performance/throughput.html"><span class="topic-status done"></span>Throughput</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="performance/latency-throughput.html"><span class="topic-status done"></span>Latency &amp; Throughput</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="craft/back-of-envelope.html"><span class="topic-status done"></span>Back-of-the-Envelope</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="reliability/resilience-patterns.html"><span class="topic-status done"></span>Resilience Patterns</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="case-studies/class-03.html"><span class="topic-status done"></span>Case Studies</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      TJIP Phase 02 — More classes added as the course progresses.
+    </footer>
+  </body>
+</html>

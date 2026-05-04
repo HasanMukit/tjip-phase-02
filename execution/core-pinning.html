@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Core Pinning — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Execution model</a></div>
+        <h1>Core <em>pinning</em></h1>
+        <p class="deck">By default, the kernel moves your threads between cores whenever it sees fit. For latency-critical hot paths, that migration is the bug. Core pinning is the override.</p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Execution model</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#default">What the kernel does by default</a></li>
+          <li><a href="#cost">The hidden cost of migration</a></li>
+          <li><a href="#what">What pinning actually is</a></li>
+          <li><a href="#numa">NUMA and why pinning isn't only about caches</a></li>
+          <li><a href="#tools">How to do it on Linux</a></li>
+          <li><a href="#trade">When pinning is wrong</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">The Linux scheduler is a marvel of fairness. It balances threads across cores, migrates them when one core is hotter than another, and prefers the configuration that maximizes overall throughput across hundreds of competing workloads. That's perfect for a desktop running Slack, a browser, and a music player. It's actively hostile to a high-frequency-trading thread that wants to keep its L1 cache warm and its tail latency under 10 microseconds. <strong>Core pinning</strong> — also called <a class="glink" href="../glossary.html#cpu-affinity">CPU affinity</a> — is the override: a way to tell the kernel "this thread runs on this core, period." The trade-off is that you give up some of the scheduler's intelligence in exchange for the cache and pipeline state that comes with staying put.</p>
+
+      <p>This page is about that trade. What the kernel does by default, why it costs you, what pinning fixes, and the cases where pinning is the wrong tool.</p>
+
+      <h2 id="default"><span class="num">01</span>What the kernel does by default</h2>
+
+      <p>When you start a thread on Linux, the scheduler doesn't bind it to any particular core. Instead, it picks a core whenever the thread becomes runnable, and it's allowed to <em>migrate</em> the thread to a different core later if doing so improves load balance. The migration happens silently — your code doesn't know it's been moved.</p>
+
+      <p>This default is good for a general-purpose system: cores stay roughly evenly loaded, no single core gets pinned at 100% while others sit idle, and overall throughput is high. But it has a cost no one usually measures: every time a thread moves to a new core, it loses everything that was warm on the old core.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — A migration loses cache state</div>
+        <svg viewBox="0 0 640 280" xmlns="http://www.w3.org/2000/svg">
+          <rect x="40" y="40" width="240" height="200" rx="6" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="1.2" />
+          <text x="160" y="62" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Core 0 (before)</text>
+          <rect x="60" y="80" width="200" height="32" fill="var(--s2)" opacity="0.7" />
+          <text x="160" y="100" text-anchor="middle" class="svg-text-bold" fill="white">L1: thread A's hot data</text>
+          <rect x="60" y="118" width="200" height="32" fill="var(--s2)" opacity="0.55" />
+          <text x="160" y="138" text-anchor="middle" class="svg-text-bold" fill="white">L2: thread A's working set</text>
+          <rect x="60" y="156" width="200" height="32" fill="var(--s2)" opacity="0.4" />
+          <text x="160" y="176" text-anchor="middle" class="svg-text-bold" fill="white">branch predictor: warm</text>
+          <text x="160" y="215" text-anchor="middle" class="svg-text-muted">running fast</text>
+
+          <path d="M 290 140 L 350 140" stroke="var(--accent)" stroke-width="2" marker-end="url(#a2)" />
+          <text x="320" y="125" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">migrate</text>
+
+          <defs>
+            <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+            </marker>
+          </defs>
+
+          <rect x="360" y="40" width="240" height="200" rx="6" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="1.2" />
+          <text x="480" y="62" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">Core 4 (after)</text>
+          <rect x="380" y="80" width="200" height="32" fill="var(--rule)" opacity="0.5" />
+          <text x="480" y="100" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">L1: empty</text>
+          <rect x="380" y="118" width="200" height="32" fill="var(--rule)" opacity="0.5" />
+          <text x="480" y="138" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">L2: empty</text>
+          <rect x="380" y="156" width="200" height="32" fill="var(--rule)" opacity="0.5" />
+          <text x="480" y="176" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">branch predictor: cold</text>
+          <text x="480" y="215" text-anchor="middle" class="svg-text-muted">slow until caches refill</text>
+        </svg>
+        <p class="figure-caption">When the scheduler moves thread A from core 0 to core 4, the L1 and L2 caches on core 4 don't have any of A's data. The thread now has to refill them — every memory access misses cache for ~50–500 µs of execution. The branch predictor's history is also local to core 0 and is lost. The migration finished in microseconds; the slowdown lingers.</p>
+      </div>
+
+      <p>The kernel doesn't deliberately punish your thread — it's just optimizing for a different metric. It cares about <em>aggregate throughput across all threads</em>; you may care about <em>this one thread's tail latency</em>. Those goals don't always agree.</p>
+
+      <h2 id="cost"><span class="num">02</span>The hidden cost of migration</h2>
+
+      <p>The thread switch itself is cheap (~1–3 µs — see <a href="context-switching.html">context switching</a>). The migration cost is what comes after, and it has three flavours:</p>
+
+      <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Cold L1/L2 caches.</strong> Per-core caches are private. The new core has none of the thread's data. The first hundred microseconds after migration are dominated by cache misses — every read pays the L3 or DRAM tax.</li>
+        <li><strong>Cold branch predictor.</strong> The branch-prediction tables are also per-core. After migration, the predictor sees this thread's branches as if for the first time, and is wrong more often until it relearns.</li>
+        <li><strong>Cross-NUMA memory.</strong> On multi-socket boxes, RAM is split across <a class="glink" href="../glossary.html#numa">NUMA nodes</a>; access to your "local" RAM is faster than access to a different socket's RAM. Migrate to a core on a different socket and your DRAM accesses now cost 1.5–2× more, often <em>without anyone telling you</em>.</li>
+      </ul>
+
+      <p>For most workloads this is invisible — the thread is doing I/O, the migration is rare, the cold-cache window is amortized away. For latency-sensitive code, it's the difference between a 50 µs operation and a 500 µs one. The p99 line on your dashboard moves up; engineers chase it for weeks; eventually someone runs <code>perf stat -e migrations</code> and finds the scheduler quietly moving the hot thread every few hundred milliseconds.</p>
+
+      <h2 id="what"><span class="num">03</span>What pinning actually is</h2>
+
+      <p>Core pinning, formally called <strong>CPU affinity</strong>, is a per-thread bit-mask: the set of cores the kernel is allowed to run that thread on. By default, every thread's mask is "all cores." Pinning narrows the mask — sometimes to a single core, sometimes to a small subset.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Default vs pinned</div>
+        <svg viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg">
+          <text x="160" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">Default</text>
+
+          <rect x="40" y="50" width="240" height="180" rx="6" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <rect x="60" y="70" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="80" y="94" text-anchor="middle" class="svg-text-bold" fill="white">C0</text>
+          <rect x="110" y="70" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="130" y="94" text-anchor="middle" class="svg-text-bold" fill="white">C1</text>
+          <rect x="160" y="70" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="180" y="94" text-anchor="middle" class="svg-text-bold" fill="white">C2</text>
+          <rect x="210" y="70" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="230" y="94" text-anchor="middle" class="svg-text-bold" fill="white">C3</text>
+
+          <rect x="60" y="120" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="80" y="144" text-anchor="middle" class="svg-text-bold" fill="white">C4</text>
+          <rect x="110" y="120" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="130" y="144" text-anchor="middle" class="svg-text-bold" fill="white">C5</text>
+          <rect x="160" y="120" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="180" y="144" text-anchor="middle" class="svg-text-bold" fill="white">C6</text>
+          <rect x="210" y="120" width="40" height="40" fill="var(--s2)" opacity="0.85" />
+          <text x="230" y="144" text-anchor="middle" class="svg-text-bold" fill="white">C7</text>
+
+          <text x="160" y="190" text-anchor="middle" class="svg-text" fill="var(--ink)">thread runnable on any core</text>
+          <text x="160" y="208" text-anchor="middle" class="svg-text-muted">scheduler migrates to balance load</text>
+
+          <text x="480" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">Pinned to C2</text>
+
+          <rect x="360" y="50" width="240" height="180" rx="6" fill="var(--paper-warm)" stroke="var(--rule)" />
+          <rect x="380" y="70" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="400" y="94" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C0</text>
+          <rect x="430" y="70" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="450" y="94" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C1</text>
+          <rect x="480" y="70" width="40" height="40" fill="var(--accent)" opacity="0.95" />
+          <text x="500" y="94" text-anchor="middle" class="svg-text-bold" fill="white">C2</text>
+          <rect x="530" y="70" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="550" y="94" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C3</text>
+
+          <rect x="380" y="120" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="400" y="144" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C4</text>
+          <rect x="430" y="120" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="450" y="144" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C5</text>
+          <rect x="480" y="120" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="500" y="144" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C6</text>
+          <rect x="530" y="120" width="40" height="40" fill="var(--rule)" opacity="0.4" />
+          <text x="550" y="144" text-anchor="middle" class="svg-text-bold" fill="var(--muted)">C7</text>
+
+          <text x="480" y="190" text-anchor="middle" class="svg-text" fill="var(--ink)">runs only on C2</text>
+          <text x="480" y="208" text-anchor="middle" class="svg-text-muted">L1/L2 stay warm across slices</text>
+        </svg>
+        <p class="figure-caption">Pinning narrows the affinity mask. With one core eligible, the scheduler still time-slices that core between this thread and others — but when this thread runs, it always runs on C2, with C2's caches still holding its data.</p>
+      </div>
+
+      <p>Pinning a thread doesn't give it the core <em>exclusively</em> — other threads can still be scheduled there too. It just guarantees the thread won't migrate. To get exclusive use of a core, you typically combine pinning with kernel boot parameters (<a class="glink" href="../glossary.html#isolcpus"><code>isolcpus</code></a>) that exclude certain cores from the general scheduler entirely.</p>
+
+      <div class="callout">
+        <div class="callout-label">Pinning vs isolation</div>
+        <strong>Pinning</strong> (<a class="glink" href="../glossary.html#sched-setaffinity">sched_setaffinity</a>) restricts where a thread runs but doesn't reserve the core. <strong>Isolation</strong> (<code>isolcpus</code> / <code>cpuset</code>) tells the kernel "don't put any general work on these cores." For genuinely tight latency requirements you do both — pin your hot thread to an isolated core, so it's the only thing that ever runs there.
+      </div>
+
+      <h2 id="numa"><span class="num">04</span>NUMA and why pinning isn't only about caches</h2>
+
+      <p>On a single-socket machine, "which core" is mostly a question of L1/L2 warmth. On a multi-socket machine, it's also a question of <strong>NUMA</strong> — Non-Uniform Memory Access — and the cost ratio is higher.</p>
+
+      <p>A two-socket box has its DRAM split: half the RAM is attached to socket 0, the other half to socket 1. A core on socket 0 reading its local DRAM takes ~80 ns. The same core reading DRAM on socket 1 — over the inter-socket link — takes ~120–160 ns. That's a 1.5–2× tax on every uncached read, applied silently.</p>
+
+      <p>If a thread allocates memory while running on socket 0 (Linux's "first touch" policy puts those pages on socket 0's local DRAM) and then gets migrated to socket 1, every subsequent access pays the cross-socket tax until those pages are re-touched and (potentially) migrated. For a long-lived process on a multi-socket NUMA box, pinning to a specific socket — and ideally a specific core — is what keeps the memory and the thread on the same NUMA node.</p>
+
+      <h2 id="tools"><span class="num">05</span>How to do it on Linux</h2>
+
+      <p>The mechanics. Three layers, from quickest to most surgical.</p>
+
+      <h3>From the shell — <code>taskset</code></h3>
+
+      <div class="codeblock"># launch a process pinned to core 2
+taskset -c 2 ./my_server
+
+# pin an existing PID's threads to cores 4–7
+taskset -pc 4-7 12345</div>
+
+      <p>Quick, no code changes, scope is whole-process. Useful for benchmarks, ops fixes, and anything where you don't have the source. The downside: every thread of the process inherits the same mask, so you can't pin one hot thread while letting bookkeeping threads roam.</p>
+
+      <h3>From inside the program — <code>sched_setaffinity</code></h3>
+
+      <p>Each language exposes the syscall differently — <code>pthread_setaffinity_np</code> in C, <code>os.sched_setaffinity</code> in Python, <code>runtime.LockOSThread</code> + thread-pinning libs in Go, etc. — but they all wrap the same Linux syscall. Per-thread pinning is the precise tool: pin the latency-critical thread, leave everything else to the scheduler.</p>
+
+      <h3>Boot-time isolation — <code>isolcpus</code> and <code>nohz_full</code></h3>
+
+      <p>Boot the kernel with <code>isolcpus=4-7</code> and the scheduler will leave cores 4–7 alone — no general work, no kernel housekeeping, no timer ticks if you also set <code>nohz_full=4-7</code>. Then pin your latency-critical threads to those cores using one of the tools above. This is the standard setup for DPDK, real-time audio, and exchange-grade trading systems.</p>
+
+      <h2 id="trade"><span class="num">06</span>When pinning is wrong</h2>
+
+      <p>Pinning is a power tool and easy to misuse. Three scenarios where it makes things worse:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>General-purpose servers</h4>
+          <p>If your workload is "many requests, each fast, all roughly the same shape," the kernel's load balancing is doing a great job. Pinning everything restricts the scheduler's ability to fill in idle cores when one thread is blocked. Throughput drops for no benefit.</p>
+        </div>
+        <div class="card">
+          <h4>Mismatched mask</h4>
+          <p>Pinning a thread to a core that's also busy with other pinned threads creates a queue. You forced contention you didn't have to. Pinning works only if the cores you pinned to actually have spare capacity for the thread.</p>
+        </div>
+        <div class="card">
+          <h4>Hyperthread siblings</h4>
+          <p>Pinning two CPU-bound threads to two hyperthread siblings of the same physical core makes them fight over the same execution units. Pin to physical cores, not logical IDs, unless you understand the topology.</p>
+        </div>
+        <div class="card">
+          <h4>Premature optimization</h4>
+          <p>If your tail latency is dominated by network I/O, GC pauses, or downstream services, pinning saves you nothing because cache thrash isn't the problem. Profile first; pin later.</p>
+        </div>
+      </div>
+
+      <p>The right reasons to pin are narrow: a hot thread whose tail latency matters, on a system where you've already proven the scheduler is moving it, and where you've measured the migration cost. The wrong reason is "it sounds like it'll be faster." Often it isn't.</p>
+
+      <h2 id="takeaway"><span class="num">07</span>The one-line takeaway</h2>
+
+      <p class="pullquote">Pinning trades the scheduler's intelligence for cache continuity. It pays off when one thread's tail latency matters more than the system's overall load balance.</p>
+
+      <p>The bigger picture is that the OS scheduler is making decisions on your behalf, every millisecond, without telling you. Most of the time those decisions are good. For the rare workloads where they're not — high-frequency trading, real-time signal processing, DPDK packet pipelines, microsecond-sensitive RPC paths — pinning is how you take the keys back. The trade is "less smart, more predictable." Predictable is what tail latency rewards.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#cpu-affinity">CPU affinity</a><a href="../glossary.html#numa">NUMA</a><a href="../glossary.html#isolcpus">isolcpus</a><a href="../glossary.html#sched-setaffinity">sched_setaffinity</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="../hardware/cache-locality.html">
+              <span class="related-arrow">→</span>
+              <span>Cache Locality &amp; Branch Prediction</span>
+              <span class="related-summary">— what gets lost when the scheduler migrates a thread.</span>
+            </a>
+          </li>
+          <li>
+            <a href="context-switching.html">
+              <span class="related-arrow">→</span>
+              <span>Context Switching</span>
+              <span class="related-summary">— the broader cost model migration sits on top of.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../hardware/memory-hierarchy.html">
+              <span class="related-arrow">→</span>
+              <span>Memory Hierarchy</span>
+              <span class="related-summary">— why per-core L1/L2 makes pinning matter.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Execution model. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+  </body>
+</html>

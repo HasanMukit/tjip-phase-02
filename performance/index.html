@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Performance — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="theme-page">
+      <header class="theme-header">
+        <div class="eyebrow">Theme 04 — Performance</div>
+        <h1>Fast, in <em>numbers</em>.</h1>
+        <p class="deck">
+          Latency is a stopwatch; throughput is a counter. Both are needed. The trade-off between them, the knee of
+          the curve, and Little's Law tying them together.
+        </p>
+      </header>
+
+      <div class="topic-rows">
+        <a href="latency.html" class="topic-row">
+          <span class="row-pill">Class 03</span>
+          <div class="row-body">
+            <h3>Latency</h3>
+            <p>Per-request stopwatch. The 1,000× hierarchy from L1 to cross-continent RTT. Access latency vs bandwidth.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="throughput.html" class="topic-row">
+          <span class="row-pill">Class 03</span>
+          <div class="row-body">
+            <h3>Throughput</h3>
+            <p>System-wide rate. RPS, QPS, TPS, goodput. The bottleneck rule and the levers for moving it.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="latency-throughput.html" class="topic-row">
+          <span class="row-pill">Class 03</span>
+          <div class="row-body">
+            <h3>Latency &amp; Throughput Together</h3>
+            <p>Independent but coupled. The knee of the curve, Little's Law (<code>L = λ × W</code>), p99 vs averages, tail-at-scale.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Theme 04 of 06. <a href="../distribution/index.html" style="color: var(--accent)">← Distribution</a> · <a href="../reliability/index.html" style="color: var(--accent)">Next: Reliability →</a>
+    </footer>
+  </body>
+</html>

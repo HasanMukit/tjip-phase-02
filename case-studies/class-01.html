@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Class 01 Case Studies — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="index.html" class="active">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Case studies</a></div>
+        <h1>Hardware <em>under the hood</em></h1>
+        <p class="deck">Twelve scenarios where the answer comes from how the machine actually works — pressure shape, cache lines, the predictor, and the OS abstractions on top. Read the problem, understand the terms, think about what you'd do — then reveal the solution.</p>
+        <div class="meta">
+          <span class="class-pill">Class 01</span>
+          <span>Theme · Hardware + Execution</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">Case studies</div>
+        <ol>
+          <li><a href="#cs1">"Can it handle 1M req/s?"</a></li>
+          <li><a href="#cs2">The matrix loop that's 8× slower one way</a></li>
+          <li><a href="#cs3">The linked list that loses to a vector</a></li>
+          <li><a href="#cs4">A hot loop that gets faster after sorting</a></li>
+          <li><a href="#cs5">Eight cores, one counter, no speedup</a></li>
+          <li><a href="#cs6">The "O(n log n)" sort that lost to "O(n²)"</a></li>
+          <li><a href="#cs7">The crash that took the whole API down</a></li>
+          <li><a href="#cs8">Our "64-vCPU" instance performs like 32</a></li>
+          <li><a href="#cs9">Async/await everywhere, no speedup</a></li>
+          <li><a href="#cs10">The Node.js API that freezes for 5 seconds</a></li>
+          <li><a href="#cs11">We doubled the thread pool and throughput dropped</a></li>
+          <li><a href="#cs12">The p99 spike that disappears with isolcpus</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">"Why is this slow?" rarely has the answer "the algorithm is wrong." More often it's the wrong layout, the wrong data shape, the wrong assumption about which bar fills up first, or a branch the predictor can't see. The cases below are built around those misreads — the kind that look like they should be fast and aren't.</p>
+
+      <div class="callout">
+        <div class="callout-label">How to read this page</div>
+        Every case study has three blocks you'll see immediately: <strong>Scenario</strong> (the setup), <strong>What's happening</strong> (the diagnosis), and <strong>Terms to know</strong> (definitions for the jargon used). The <strong>solution</strong> is hidden behind a "Reveal" toggle. Try your own answer first — the fix lands harder when you've already committed to a guess.
+      </div>
+
+      <h2 id="cs1"><span class="num">01</span>"Can it handle 1M req/s?"</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        An interviewer asks: "Design a system that handles 1 million requests per second." You're about to say "I'd put a load balancer in front of an autoscaling group of 100 servers, each handling 10K RPS, with Redis caching and Postgres behind it" — and then you stop. They haven't told you what the request <em>does</em>.
+      </div>
+
+      <p><strong>What's happening.</strong> "1M req/s" is a rate without a unit of work. The same number describes a fleet of CDN nodes serving cached thumbnails, a fleet of GPU boxes running ML inference, a queue of bcrypt logins, and a video CDN streaming HLS chunks — and the four systems share almost nothing in common. Each kind of request stresses a different piece of hardware (CPU, RAM, disk, network), and the right architecture is whichever one has enough of <em>that</em> resource. Until you know which component the work pressures, every architectural answer is a guess. The interviewer is testing whether you'll ask.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>RPS (requests per second)</dt>
+          <dd>The aggregate rate of incoming requests. A throughput number — see <a href="../performance/throughput.html">throughput</a> — and useless on its own without a per-request work estimate.</dd>
+
+          <dt>Pressure shape / pressure profile</dt>
+          <dd>Which of CPU, RAM, disk, network the request stresses most. The same RPS produces different shapes for different request types.</dd>
+
+          <dt>CPU-bound</dt>
+          <dd>Work whose limit is cycles per second — crypto, parsing, compression, ML inference. Fixed by faster cores or more cores.</dd>
+
+          <dt>Memory-bound</dt>
+          <dd>Work whose limit is RAM capacity or bandwidth — large in-memory tables, cache-heavy lookups. Fixed by more RAM or sharding.</dd>
+
+          <dt>I/O-bound</dt>
+          <dd>Work whose limit is disk or network — durable writes, blob fetches, video. Fixed by faster storage, more disks, or CDN edge nodes.</dd>
+
+          <dt>IOPS</dt>
+          <dd>I/O operations per second a disk can sustain. NVMe SSDs do hundreds of thousands; spinning disks do ~150.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Don't answer the architecture question. Answer the question behind it first.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Pause and ask three questions before drawing any boxes:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>What does one request do?</strong> Read or write? Compute-heavy or I/O-heavy? Touches the database or just memory? Bytes per request?</li>
+            <li><strong>Which component is the tallest bar?</strong> CPU, RAM, disk, or network. Estimate per-request cost on that component, multiply by RPS, and you have a hardware target.</li>
+            <li><strong>What can be skipped?</strong> A million reads can usually be cached. A million writes usually can't. Whichever component is tallest, the design is mostly about how to reduce the cost on that one component or spread it across more boxes.</li>
+          </ol>
+
+          <p>Now sketch the architecture. Each pressure shape pulls a different design: <strong>video</strong> → CDN edges (network bandwidth distributed); <strong>logins</strong> → queue + worker pool (CPU absorbed asynchronously); <strong>health checks</strong> → fewer-fatter requests / SO_REUSEPORT / connection multiplexing (packets-per-second relief); <strong>writes</strong> → batching, sharding, or relaxed durability (disk IOPS spread). The architecture is downstream of the pressure shape — never the other way round.</p>
+
+          <p class="pullquote">"It depends" isn't a cop-out here; it's the right answer. The follow-up "depends on what?" is the actual interview.</p>
+
+          <p>Companion reading: <a href="../hardware/hardware-pressure.html">hardware pressure</a> walks through five concrete pressure profiles for the same RPS number.</p>
+        </div>
+      </details>
+
+      <h2 id="cs2"><span class="num">02</span>The matrix loop that's 8× slower one way</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        An engineer rewrites a 4096 × 4096 image-processing kernel "to be cleaner" and reports it's now 8× slower. The diff is one line — they swapped the order of two nested loops. The outer loop now iterates columns; the inner loop iterates rows. Same data, same operations, same result. Eight times slower.
+      </div>
+
+      <p><strong>What's happening.</strong> A 2D array in most languages is stored in <strong>row-major order</strong> — element <code>arr[r][c]</code> sits next to <code>arr[r][c+1]</code> in memory, not <code>arr[r+1][c]</code>. Iterating <code>for r: for c: ...</code> walks memory in the order it's actually laid out — every read pulls in 16 ints, the next 15 are L1 hits, perfect spatial locality. Iterating <code>for c: for r: ...</code> jumps an entire row's worth of bytes between reads — every access is a fresh cache line, almost every read misses L1, many miss L2, and at 4096-wide rows they're hammering DRAM. The "cleaner" loop order accidentally turned every access into a cache miss.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Row-major / column-major</dt>
+          <dd>How a 2D array is flattened in memory. C, C++, Java, Python (numpy default), Rust use row-major: <code>arr[r][c]</code> is followed by <code>arr[r][c+1]</code>. Fortran and MATLAB use column-major.</dd>
+
+          <dt>Cache line</dt>
+          <dd>The smallest unit of memory traffic between cache tiers, almost universally 64 bytes. Reading one byte fetches the whole line.</dd>
+
+          <dt>Spatial locality</dt>
+          <dd>The principle that programs tend to access nearby addresses close in time. Caches are designed around this assumption — see <a href="../hardware/cache-locality.html#locality">cache locality</a>.</dd>
+
+          <dt>Cache miss</dt>
+          <dd>An access that wasn't already in the requested cache tier and has to fall to a slower one. An L1 miss costs ~3 ns (L2 hit); an LLC miss costs ~80 ns (DRAM).</dd>
+
+          <dt>Stride</dt>
+          <dd>The byte distance between consecutive memory accesses. Stride-1 (sequential) is the cache's best case; stride-N where N exceeds a cache line ruins locality.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Match the iteration order to the storage order. Or change the storage order.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Two options, depending on whether the loop order is fixed by the algorithm or by accident:</p>
+
+          <div class="two-col">
+            <div class="card">
+              <h4>Fix the loop order</h4>
+              <p>If the algorithm doesn't require column-first access, just swap the loops back to row-first. Sequential access turns the same algorithm from DRAM-bound to L1-bound — typically 5–10× faster on a large matrix without changing a single line of math.</p>
+            </div>
+            <div class="card">
+              <h4>Transpose the data</h4>
+              <p>If the algorithm genuinely needs column-first access (linear algebra, image rotation), transpose the matrix once up front so the columns become rows in memory. Pay the transpose cost once; the inner loops then run sequential. For repeated access, this always wins.</p>
+            </div>
+          </div>
+
+          <p>The deeper lesson is that "this code is correct" and "this code is fast" are checked against different rulebooks. Compilers will not silently rearrange your loops to be cache-friendly — that's <em>your</em> job. When you see an unexpected slowdown after a refactor that "shouldn't matter," the cache is the first place to look.</p>
+
+          <p>See: <a href="../hardware/cache-locality.html#lines">cache lines, not bytes</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs3"><span class="num">03</span>The linked list that loses to a vector</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A team is choosing a data structure for a workload that frequently inserts and removes elements in the middle of a sequence of 10,000 records, then iterates over them to compute a sum. Textbook says linked list — O(1) insert, O(1) remove, O(n) iterate. They benchmark <code>std::list</code> against <code>std::vector</code> (which has O(n) inserts in the middle) expecting the list to win. The vector is roughly 5× faster on the workload they actually run.
+      </div>
+
+      <p><strong>What's happening.</strong> The textbook is grading on the wrong axis. <code>std::list</code> has each node allocated separately on the heap, so the nodes scatter across DRAM. Iterating it means following a pointer to the next node — a fresh address with no spatial locality, missing the cache nearly every step. <code>std::vector</code> stores everything contiguously: every iteration is sequential, the prefetcher feeds the next line before you ask, and 16 elements per cache line makes the iterate part essentially free. The list's O(1) insert wins by a few hundred nanoseconds; its iterate loses by tens of milliseconds. Even with O(n) work per insert, the vector ends up ahead because the constants are 100× different.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Pointer chasing</dt>
+          <dd>Following a chain of pointers (linked list, tree, graph) where each <code>next</code> dereference touches a new, possibly distant memory address. Each hop is a potential cache miss.</dd>
+
+          <dt>Contiguous memory</dt>
+          <dd>Data laid out as a single block of bytes. Arrays, vectors, and most string types are contiguous. The prefetcher and cache lines were designed for it.</dd>
+
+          <dt>Prefetcher</dt>
+          <dd>A small unit on the CPU that detects sequential access patterns and pulls upcoming cache lines into L1 before the program asks. Helps stride-1 access; helpless against pointer chasing.</dd>
+
+          <dt>Big-O constants</dt>
+          <dd>The hidden multipliers in big-O notation — O(1) on a structure with 100 ns per operation can lose to O(n) on a structure with 1 ns per operation, for any n smaller than the crossover point.</dd>
+
+          <dt>std::list / std::vector</dt>
+          <dd>C++ Standard Library types: <code>list</code> is a doubly-linked list of heap-allocated nodes; <code>vector</code> is a dynamically-sized contiguous array.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">The "asymptotically worse" structure wins because of constants. Use the vector.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Use <code>std::vector</code> (or its equivalent in your language). The textbook analysis of "O(n) inserts" hides that those inserts are <code>memmove</code> — a CPU operation specifically optimized to scream through contiguous memory at multiple GB/s. Moving 5,000 ints is hundreds of nanoseconds, not milliseconds. The contiguous layout pays for the asymptotic loss many times over on every iteration.</p>
+
+          <p>The general rule that falls out: <strong>contiguous beats pointer-chasing for almost any workload under tens of thousands of items</strong>. Linked lists earn their keep only when (a) elements are very large so memmove genuinely costs a lot, (b) external pointers must remain stable across inserts, or (c) splice operations dominate over iteration. Most real workloads tick none of those boxes.</p>
+
+          <p class="pullquote">"O(1) insert" is irrelevant if you spend 99% of your time iterating, and iteration on the O(1) structure is 100× slower per element.</p>
+
+          <p>Bjarne Stroustrup's classic talk on this benchmarks lists vs vectors at sizes from 100 to 1M and the vector wins everywhere. The cache, not the algorithm, is the deciding factor.</p>
+        </div>
+      </details>
+
+      <h2 id="cs4"><span class="num">04</span>A hot loop that gets faster after sorting</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Hot path: a million integer transactions per second, each tagged with a "high-value" flag (true if amount &gt; threshold). The pipeline filters and sums only the high-value ones in a tight inner loop. A coworker, debugging something unrelated, sorts the batch by amount before the loop runs. They notice the loop now runs 4× faster — even with the sort included. They can't explain why and ask you. Sorting added work and the program got faster.
+      </div>
+
+      <p><strong>What's happening.</strong> The original loop was bottlenecked by <strong>branch mispredictions</strong>, not by computation. The CPU runs instructions in a deep pipeline; when it hits an <code>if</code>, it speculates which way to go and fetches ahead on that path. With shuffled data, "is this transaction high-value?" flips ~50% of the time — the predictor can't find a pattern, guesses wrong half the time, and pays a 10–20 cycle pipeline flush on every wrong guess. Sorting makes the branch outcome go "false, false, false, ..., true, true, true" — one transition in the entire batch. The predictor reaches near-100% accuracy, no flushes, and the loop runs at peak instructions-per-cycle. The savings on the loop swamped the cost of the sort.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>CPU pipeline</dt>
+          <dd>The CPU's overlapping execution stages — fetch, decode, execute, retire. A modern core has 15–20 stages of instructions in flight at once. Keeping the pipeline full is most of what makes a CPU "fast."</dd>
+
+          <dt>Branch prediction</dt>
+          <dd>The CPU speculates which side of an <code>if</code> will be taken so it can keep fetching instructions instead of stalling. Modern predictors hit &gt;95% accuracy on biased branches.</dd>
+
+          <dt>Branch mispredict</dt>
+          <dd>A wrong guess. The pipeline must flush all the speculative work and restart on the correct path, costing ~10–20 cycles per mispredict.</dd>
+
+          <dt>Predictable branch</dt>
+          <dd>A branch whose outcome is highly biased (almost always taken or almost never taken) or has a regular pattern. Sorted data turns "is x &gt; T?" into a maximally predictable branch.</dd>
+
+          <dt>Branchless code</dt>
+          <dd>An equivalent computation written without an <code>if</code> — using arithmetic or conditional-move instructions. No branch means nothing to mispredict.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Two ways to fix it. Both kill the misprediction.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> The bottleneck is an unpredictable branch. There are two fixes, and which one to pick depends on whether the sort is useful for other reasons:</p>
+
+          <div class="two-col">
+            <div class="card">
+              <h4>Sort the data first</h4>
+              <p>If the batch is reused multiple times or the sort gives you something else useful (deterministic order, easier dedup, simpler pagination), pay the O(n log n) once and let every downstream branch be maximally predictable. Often a free win when the data is touched more than once.</p>
+            </div>
+            <div class="card">
+              <h4>Make the loop branchless</h4>
+              <p>Rewrite as <code>sum += (amount &gt; T) * amount</code> or use a SIMD masked-add. No branch means nothing for the predictor to be wrong about. This works even on shuffled data and is often what compilers do for you when they can prove it's safe.</p>
+            </div>
+          </div>
+
+          <p>This case is an instance of the famous Stack Overflow question "<em>Why is processing a sorted array faster than processing an unsorted array?</em>" — covered in detail on the <a href="../hardware/cache-locality.html#sorted">cache locality &amp; branch prediction</a> page. The deeper takeaway: when a hot loop has a data-dependent branch and the data isn't biased, branch mispredictions are usually the bottleneck, not arithmetic.</p>
+
+          <p class="pullquote">Doing extra work made the program faster because the extra work made the rest of the work predictable.</p>
+        </div>
+      </details>
+
+      <h2 id="cs5"><span class="num">05</span>Eight cores, one counter, no speedup</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A team parallelizes a hot path across 8 threads. Each thread increments its own slot in a shared array — <code>counters[thread_id]</code> — to count events. They expect roughly 8× throughput. They get ~1.2×. Profiling shows all 8 threads spending most of their time in cache-coherence traffic, not in user code. The array is only 32 bytes long.
+      </div>
+
+      <p><strong>What's happening.</strong> The 8 thread-local counters happen to fit inside a single 64-byte cache line. Even though no thread shares a logical variable with any other, they all share the <em>cache line</em>. Every increment by thread 0 invalidates that line in threads 1–7's caches; their next increment now misses, fetches the line back from L3, and invalidates everyone else's copy. The line bounces between cores at L3 latency on every increment. This is <strong>false sharing</strong>: variables that are independent in the code are coupled at the hardware level because they collide on a cache line.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>False sharing</dt>
+          <dd>When threads modify <em>different</em> variables that happen to live on the same cache line, the line ping-pongs between cores even though there's no logical sharing. The cost is invisible at the source level and can erase parallelism completely.</dd>
+
+          <dt>Cache coherence</dt>
+          <dd>The protocol (MESI, MOESI) that keeps each core's view of memory consistent. When one core writes a line, every other core's copy must be invalidated or updated before the write is visible.</dd>
+
+          <dt>Cache line bouncing</dt>
+          <dd>Repeated invalidate/reload of the same cache line across cores under contention. Each round-trip is ~30+ ns through L3, dwarfing the cost of the actual increment.</dd>
+
+          <dt>Cache line padding</dt>
+          <dd>Inserting unused bytes between fields so each lives on its own 64-byte line. The standard fix for false sharing.</dd>
+
+          <dt>Shared L3</dt>
+          <dd>The shared last-level cache where coherence traffic between cores resolves — see <a href="../hardware/memory-hierarchy.html#caches">L1, L2, L3</a>.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">The variables aren't sharing data — they're sharing a cache line. Pad them apart.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Pad each thread's counter to its own cache line. In C++ that's <code>alignas(64)</code> on each counter; in Java it's <code>@Contended</code> (or manual padding fields); in Rust it's <code>#[repr(align(64))]</code>. The array goes from 32 bytes (all on one line) to 8 × 64 = 512 bytes (each on its own line). The coherence traffic vanishes; the threads truly run independently; throughput jumps to ~7.5× of single-thread.</p>
+
+          <p>The general lesson cuts deep: <strong>shared mutable state at the cache-line granularity is the silent killer of multi-core code</strong>. You can write code that looks perfectly partitioned at the variable level and still serialize through L3 because two unrelated fields share 64 bytes. The fix is layout: align hot per-thread state to cache-line boundaries, and never put two-thread-touched fields on the same line.</p>
+
+          <p>This is also why high-performance counter libraries (LongAdder in Java, sharded counters in Go) exist — they're false-sharing-aware data structures.</p>
+
+          <p class="pullquote">If the code is parallel but the bytes aren't, the hardware will serialize you behind the cache line.</p>
+        </div>
+      </details>
+
+      <h2 id="cs6"><span class="num">06</span>The "O(n log n)" sort that lost to "O(n²)"</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Someone notices that <code>std::sort</code> in their C++ standard library calls insertion sort whenever a partition has fewer than 16 elements. A junior engineer thinks this is a bug — insertion sort is O(n²), the rest of the algorithm is O(n log n), why would anyone fall back to a worse algorithm? They prepare a PR replacing it with quicksort all the way down. Reviewer asks them to benchmark first. The benchmark shows the "fixed" version is slower.
+      </div>
+
+      <p><strong>What's happening.</strong> Big-O describes the algorithm in the limit. For n = 8 or n = 12, the limit hasn't kicked in — the constant factors dominate. Insertion sort on a small array has perfect spatial locality (it walks the array linearly), a tight inner loop with very few instructions, and a branch that becomes biased quickly as the array becomes mostly sorted. Quicksort on the same array has function-call overhead, pivot selection, partition logic, and indirect jumps — all of which cost real cycles per recursion. The "more comparisons" of insertion sort run at peak speed; the "fewer comparisons" of quicksort run with a per-call tax that the small n can't amortize. Below the crossover (~16 elements on most CPUs), the worse-on-paper algorithm finishes first.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Big-O</dt>
+          <dd>Asymptotic time complexity — how runtime grows with input size as it goes to infinity. Hides constant factors that dominate at small sizes.</dd>
+
+          <dt>Insertion sort</dt>
+          <dd>O(n²) sort that walks the array, inserting each new element into its correct position among the already-sorted prefix. Tiny code, perfect spatial locality, very fast on small or partially-sorted arrays.</dd>
+
+          <dt>Introsort / Timsort / pdqsort</dt>
+          <dd>Real-world hybrid sort algorithms that quicksort or mergesort large partitions and switch to insertion sort below a small-n threshold. Used by C++, Java, Python, Rust standard libraries.</dd>
+
+          <dt>Crossover point</dt>
+          <dd>The input size where one algorithm overtakes another. Below the crossover the "worse" algorithm wins because of constants; above it the "better" one wins as asymptotic behaviour kicks in.</dd>
+
+          <dt>Function-call overhead</dt>
+          <dd>The fixed cost of entering and leaving a function — stack frame, register save/restore, return address. Cheap individually, expensive when paid per recursion on tiny inputs.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Reject the PR. Explain why every serious sort library does this on purpose.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Close the PR. The hybrid is not a bug — it's the result of decades of empirical tuning. Every serious sort implementation does some version of it:</p>
+
+          <ul style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>libc++ <code>std::sort</code></strong> — introsort: quicksort, with insertion sort below ~16 elements and heapsort if recursion gets too deep.</li>
+            <li><strong>Python's <code>sorted()</code></strong> — Timsort: mergesort with insertion-sort runs and a clever run-detection step.</li>
+            <li><strong>Rust's <code>sort_unstable</code></strong> — pdqsort: quicksort variant with insertion sort at the leaves and median-of-3 pivots.</li>
+            <li><strong>Java's <code>Arrays.sort</code></strong> — Timsort for objects, dual-pivot quicksort with insertion-sort fallback for primitives.</li>
+          </ul>
+
+          <p>The deeper lesson — and the one that takes a while to internalize — is that <strong>asymptotic complexity is a guide, not a god</strong>. On real hardware the constants are determined by cache lines, branch prediction, and per-call overhead, and the constants can swing the answer at the sizes you actually have. The fastest real-world implementations of nearly every classic algorithm have a "switch to a simpler thing below n=K" clause for exactly this reason.</p>
+
+          <p class="pullquote">Asymptotic optimality is a property of the algorithm. Wall-clock optimality is a property of the algorithm <em>and</em> the machine.</p>
+
+          <p>See: <a href="../hardware/cache-locality.html#sorts">why "inefficient" sorts win on small arrays</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs7"><span class="num">07</span>The crash that took the whole API down</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A Python Flask service handles 200 req/s using a single Gunicorn worker with <code>--threads 64</code>. On Friday afternoon, an attacker sends a malformed request that causes the JSON parser to allocate ~8 GB of RAM. The cgroup memory limit (4 GB) trips and the Linux OOM killer SIGKILLs the process. Every other in-flight request — 63 of them, totally unrelated — dies with it. The pod restarts in a loop; users see 60 seconds of 5xx.
+      </div>
+
+      <p><strong>What's happening.</strong> A single process with 64 threads is one address space holding 64 execution cursors. The OS's unit of memory accounting and crash containment is the <em>process</em>, not the thread. When one bad request inflates memory beyond the limit, the OOM killer doesn't ask which thread caused it — it picks the process and kills the whole thing. Threads bought you cheap concurrency at the cost of zero blast-radius isolation: 64 in-flight requests share a single fate. The thread pool isn't the bug; assuming threads provide isolation is.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Process / address space</dt>
+          <dd>The OS's unit of memory isolation. One process owns one address space; the kernel guarantees no other process can read or write its memory. Memory limits, file-descriptor tables, and crashes apply per-process.</dd>
+
+          <dt>Thread (revisit)</dt>
+          <dd>An execution cursor inside a process. All threads in a process share the heap, file descriptors, and process-level limits. Killing the process kills every thread inside it.</dd>
+
+          <dt>Worker process</dt>
+          <dd>A separate OS process spawned by a server framework (Gunicorn, uWSGI, Apache mpm_prefork) to serve a slice of the load. Workers don't share memory; a crash in one is contained to that worker.</dd>
+
+          <dt>Blast radius</dt>
+          <dd>The set of users or operations affected when something fails. Threads share blast radius with their process; processes don't share with each other. Choosing threads vs processes is choosing how big "one failure" gets.</dd>
+
+          <dt>OOM killer</dt>
+          <dd>The Linux kernel's out-of-memory mechanism. When a memory limit is hit, it picks a process and SIGKILLs it. Operates at process granularity — there's no such thing as killing one bad thread.</dd>
+
+          <dt>cgroup memory limit</dt>
+          <dd>A per-process / per-container memory ceiling enforced by the kernel. Containers (Docker, Kubernetes) use cgroups to enforce per-pod limits.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Two layers: pick the right blast-radius unit, and don't let one request own the process's RAM.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Two changes, in order of priority:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Move from one big worker to several smaller ones.</strong> <code>gunicorn --workers 4 --threads 16</code> gives you 4 isolated processes, each with 16 threads. A bad request now crashes <em>one</em> worker (16 in-flight requests lost), not all 64. The other 3 keep serving. This is the prefork model; Apache, uWSGI, Postgres, and Chrome all use a version of it for the same reason.</li>
+            <li><strong>Cap per-request resource use.</strong> Add a max payload size (HTTP 413 above 1 MB), a parser memory ceiling, and a per-request timeout. The multi-process change is the safety net; this is the primary defence so the OOM never has to fire.</li>
+          </ol>
+
+          <p class="pullquote">Isolation is a property of processes, not threads. If "one bad request takes down N of them" is unacceptable, threads alone are the wrong tool.</p>
+
+          <p>See: <a href="../execution/process-vs-thread.html">process vs thread</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs8"><span class="num">08</span>Our "64-vCPU" instance performs like 32</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A team capacity-plans a CPU-bound number-crunching service against a 64-vCPU AWS instance, expecting roughly 8× the throughput of an 8-vCPU baseline. The benchmark on the new box delivers ~5×. p99 under load is much higher than predicted. Engineers spend a week chasing locks and contention. The bottleneck isn't the software — the capacity model was wrong.
+      </div>
+
+      <p><strong>What's happening.</strong> "vCPU" in cloud parlance almost always means <em>logical CPU</em> — a hardware thread, not a physical core. A "64-vCPU" instance is typically 32 physical cores × 2-way SMT (Hyper-Threading). For CPU-bound work that fully uses execution units, two HT siblings on the same physical core deliver only ~1.2–1.4× the throughput of one — not 2× — because they share ALUs, FPUs, L1, and the front-end. So "64 vCPUs" delivers ~32 × 1.3 = ~42 effective cores' worth of CPU-bound throughput, not 64. The capacity model was off by ~50% from day one.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Physical core</dt>
+          <dd>A complete CPU execution engine — its own ALU, FPU, L1 cache, branch predictor, register file. Cores are silicon; the only way to add more is different hardware.</dd>
+
+          <dt>Hardware thread / SMT / Hyper-Threading</dt>
+          <dd>A second execution context bolted onto a physical core (own register file + program counter, shared everything else). Hides instruction stalls; gains ~20–40% on mixed workloads, much less on pure CPU-bound ones.</dd>
+
+          <dt>Logical CPU / vCPU</dt>
+          <dd>What the OS sees. One logical CPU = one hardware thread slot. Cloud "vCPU" billing units are usually logical CPUs, which inflates the apparent core count by 2× on SMT-enabled instances.</dd>
+
+          <dt>lscpu</dt>
+          <dd>Linux command exposing the topology — <code>Thread(s) per core</code>, <code>Core(s) per socket</code>, <code>Socket(s)</code>. Physical cores = sockets × cores-per-socket. The number to plan against.</dd>
+
+          <dt>Capacity model</dt>
+          <dd>The math used to predict how much hardware you need for a given load. CPU-bound capacity should count physical cores; I/O-bound capacity can count logical CPUs because waits are real.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Recompute the model. The marketing number isn't a throughput number.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Three steps:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Recompute against physical cores.</strong> <code>lscpu</code> on the new box: 32 physical cores × 2-way SMT = 64 logical CPUs. Effective CPU-bound throughput ≈ 32 × 1.3 = ~42 single-thread units, not 64. Either accept the lower number, upgrade to a higher core count, or look at the next two options.</li>
+            <li><strong>Pick instance types where SMT is disabled or absent.</strong> Some AWS / GCP / Azure SKUs offer "metal" instances that expose silicon directly, or have HT explicitly disabled. For latency-critical CPU-bound work, those are sometimes a better $/throughput than chasing more vCPUs.</li>
+            <li><strong>Pin hot threads to physical cores</strong> if tail latency matters more than peak throughput — see <a href="../execution/core-pinning.html">core pinning</a>. One hot thread per physical core, HT sibling left idle, no execution-unit contention.</li>
+          </ol>
+
+          <p class="pullquote">Count physical cores for performance models; logical CPUs are a billing and scheduling unit, not a throughput unit.</p>
+
+          <p>See: <a href="../execution/process-vs-thread.html#core-vs-thread">core vs thread</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs9"><span class="num">09</span>Async/await everywhere, no speedup</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A Python data-processing service runs at ~30% of one core, doing CPU-heavy NumPy work. The team rewrites the codebase with <code>async</code>/<code>await</code> throughout, expecting "concurrency" to roughly double throughput. After the rewrite, throughput is identical. CPU usage is still 30% of one core. The async migration was a six-week project that produced zero performance gain.
+      </div>
+
+      <p><strong>What's happening.</strong> They confused concurrency with parallelism. <code>async</code>/<code>await</code> adds <em>concurrency</em> — the runtime can suspend a coroutine when it yields and resume another, so many tasks are in flight. It does not add <em>parallelism</em> — actual simultaneous execution on multiple cores. Python's default <code>asyncio</code> runtime is single-threaded; one event loop, one core. For CPU-bound work that never <code>await</code>s (because there's no I/O to wait for), the runtime has nothing to interleave; <code>async</code>/<code>await</code> is pure syntactic overhead with zero throughput benefit. Async is the right tool for I/O-bound work; this workload is CPU-bound.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Concurrency</dt>
+          <dd>The program's structure — multiple tasks in flight, making progress over the same span of time. A property of how the code is written. Doesn't require multiple cores.</dd>
+
+          <dt>Parallelism</dt>
+          <dd>Simultaneous execution on multiple hardware lanes (cores, machines). A property of how the program runs. Requires multiple cores; concurrency enables but doesn't guarantee it.</dd>
+
+          <dt>async / await</dt>
+          <dd>Syntactic constructs for cooperative concurrency. The runtime suspends a coroutine at <code>await</code> points and resumes another. Single-threaded by default in Python (<code>asyncio</code>) and JavaScript.</dd>
+
+          <dt>CPU-bound vs I/O-bound</dt>
+          <dd>CPU-bound work fully uses the CPU and rarely yields — math, parsing, compression. I/O-bound work spends most of its time waiting on external things (disk, network, database) and yields frequently. Async helps the second; not the first.</dd>
+
+          <dt>GIL (Python's Global Interpreter Lock)</dt>
+          <dd>A mutex that serializes Python bytecode execution across threads — at most one OS thread runs Python at a time. Means even <code>threading</code> doesn't give CPU-bound parallelism in pure Python; <code>multiprocessing</code> is the workaround.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Async was the wrong tool. Pick the one that adds parallelism.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Async/await isn't fixing this workload. Two options that actually add parallelism:</p>
+
+          <div class="two-col">
+            <div class="card">
+              <h4>multiprocessing</h4>
+              <p>Spawn N worker processes (one per physical core), each with its own Python interpreter. Bypasses the GIL entirely. Best for embarrassingly-parallel CPU work — every process gets its own slice of the input, results are collected at the end.</p>
+            </div>
+            <div class="card">
+              <h4>Native parallel libraries</h4>
+              <p>NumPy, pandas, SciPy, sklearn release the GIL inside their C/Fortran kernels. A single Python process with native threads (or <code>concurrent.futures.ThreadPoolExecutor</code>) can use multiple cores for the parts of the workload already running outside Python.</p>
+            </div>
+          </div>
+
+          <p>If the workload had been I/O-bound (waiting on databases, HTTP calls, file reads), async/await would have helped — one event loop juggling hundreds of in-flight requests on one core. The mistake was applying an I/O-bound tool to a CPU-bound workload.</p>
+
+          <p class="pullquote">Concurrency is the program's idea; parallelism is the hardware's. Naming which you actually need stops six-week rewrites that don't move the needle.</p>
+
+          <p>See: <a href="../execution/concurrency-vs-parallelism.html">concurrency vs parallelism</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs10"><span class="num">10</span>The Node.js API that freezes for 5 seconds</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A Node.js webhook receiver processes events from a partner. Most are tiny (~5 KB JSON). Once an hour, the partner sends a batch update — a single ~50 MB JSON payload. While that one request is being parsed, every other endpoint — including the <code>/healthz</code> Kubernetes liveness probe — times out. The pod gets SIGKILLed by the kubelet. The cycle repeats every hour like clockwork.
+      </div>
+
+      <p><strong>What's happening.</strong> Node.js runs all user code on a single thread. <code>JSON.parse</code> is synchronous — the call doesn't return until parsing finishes. On a 50 MB payload, that's ~3–5 seconds of straight CPU work, during which the event loop cannot tick. No requests are accepted, no responses are sent, no timers fire, no I/O completions are processed. From outside, the server is dead. The healthz probe times out at 3 seconds, the kubelet concludes the pod is unhealthy, and SIGKILL follows. The whole system is working exactly as designed — except for the one rule of single-threaded JavaScript: <em>never block the loop</em>.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Event loop</dt>
+          <dd>The single-threaded scheduler at the heart of Node.js / browser JavaScript. Pulls one task at a time off a queue, runs it to completion, then picks the next.</dd>
+
+          <dt>Block the loop</dt>
+          <dd>Synchronously execute code that doesn't return for a long time. The whole runtime stops while it runs — no I/O, no timers, no other requests. The cardinal sin of single-threaded JS.</dd>
+
+          <dt>JSON.parse</dt>
+          <dd>JavaScript's standard JSON parser. Synchronous, all-or-nothing — cost scales with input size. There is no streaming variant in the standard library.</dd>
+
+          <dt>Liveness probe</dt>
+          <dd>A periodic health check from an orchestrator (Kubernetes, Nomad). If the endpoint doesn't respond within the configured timeout, the orchestrator concludes the pod is broken and restarts it.</dd>
+
+          <dt>worker_threads</dt>
+          <dd>Node.js module that spawns a separate OS thread with its own JS context and event loop. Communicates with the main thread by structured-clone message-passing — no shared mutable state. The right tool for genuinely-CPU-heavy work in Node.</dd>
+
+          <dt>Stream parser</dt>
+          <dd>A parser that processes input incrementally, yielding control between chunks. Libraries like <code>stream-json</code> let the event loop tick during a long parse.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Three options. All of them stop the loop from being held captive.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Three options, in order of cost to implement:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Reject big payloads at the gate.</strong> Return HTTP 413 (Payload Too Large) for anything above 1 MB and require the partner to chunk it. Cheapest fix; works if you have the leverage with the partner.</li>
+            <li><strong>Stream-parse instead of buffering.</strong> Use <code>stream-json</code> or <code>JSONStream</code> to parse in chunks. Each chunk yields the event loop a chance to tick — health checks pass, other requests get served. Throughput on the big payload is similar; responsiveness is restored.</li>
+            <li><strong>Move parsing to a worker thread.</strong> Spawn a <code>worker_threads</code> worker for CPU-heavy parsing. The main event loop stays free; the worker has its own thread, its own loop, its own JS context. More complexity (message-passing, no shared state) but gives true parallelism.</li>
+          </ol>
+
+          <p class="pullquote">On a single-threaded runtime, no synchronous task may take long enough to be visible. The fix is always: don't do the work, do it incrementally with yields, or do it on another thread.</p>
+
+          <p>See: <a href="../execution/event-loop.html">the JavaScript event loop</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs11"><span class="num">11</span>We doubled the thread pool and throughput dropped</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A Java request handler on a 16-core box (32 logical CPUs with HT) has a thread pool of 32. Throughput is ~12K RPS. To handle a forecast traffic spike, the team doubles the pool to 64. Throughput drops to ~9K RPS. CPU utilization goes up (95% vs 80%) but goodput goes down. They double again to 128 — throughput crashes to ~5K. Adding workers made the system slower.
+      </div>
+
+      <p><strong>What's happening.</strong> The throughput-vs-thread-count curve has a peak, and 32 threads was at or near it. Past the peak, three costs compound: (1) more context switches per second — direct cost of register save/restore + scheduler bookkeeping rises. (2) More threads contending for shared L1/L2/L3 means each thread's working set evicts the others'; everyone runs with cold caches and the CPU's effective IPC drops. (3) More threads contending for the same locks (DB connection pool, shared structures) means more time waiting and more <em>voluntary</em> context switches into the deal. CPU is busier, real work done is less. Doubling the thread count moved them deeper onto the bad side of the cliff.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Context switch</dt>
+          <dd>The OS pausing one thread and resuming another. Direct cost ~1–10 µs (registers, scheduler state). Indirect cost (cold caches, cold branch predictor, TLB misses) is another ~50–500 µs of slow execution after the switch.</dd>
+
+          <dt>Voluntary context switch</dt>
+          <dd>A thread blocks itself (waiting on a lock, I/O, sleep). The kernel marks it not-runnable and picks someone else. Lots of voluntary switches = the program is I/O-bound or lock-contended.</dd>
+
+          <dt>Involuntary context switch</dt>
+          <dd>The kernel preempts a running thread because its slice expired. Pure overhead — the thread didn't agree to give up the CPU. Lots of involuntary switches = too many runnable threads.</dd>
+
+          <dt>Cache thrash</dt>
+          <dd>When too many threads share too few caches, each thread evicts the others' data. Every thread runs with cold L1/L2; effective performance plummets across the board.</dd>
+
+          <dt>Goodput (revisit)</dt>
+          <dd>Useful throughput — successful, non-retried, non-error work. Distinct from raw throughput, which counts everything. See <a href="../performance/throughput.html">throughput</a>.</dd>
+
+          <dt>C10K problem</dt>
+          <dd>Late-1990s industry challenge of handling 10,000 concurrent connections per server. The thread-per-connection model collapsed under exactly this curve, which is why event loops and lightweight threads exist.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Profile, find the peak, stop guessing. The right number is below where they started.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Three steps, in order:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Find the actual peak.</strong> Sweep thread-pool size (8, 16, 24, 32, 48, 64) under representative load and measure goodput, p99 latency, and context-switch rate (<code>vmstat</code> or <code>pidstat -w</code>). For CPU-bound work the peak is usually 1–2× the physical core count; for I/O-bound work it can be much higher because threads spend most of their time blocked. Set the pool slightly below the peak for headroom.</li>
+            <li><strong>Diagnose the switching mix.</strong> If <code>cs/s</code> is dominated by voluntary switches, threads are blocking on something — find the lock or the slow downstream call and fix that, not the thread count. If involuntary switches dominate, you have too many runnable threads — reduce the pool.</li>
+            <li><strong>Switch the model for I/O-bound work.</strong> If most work is waiting on databases or downstream calls, replace the thread pool with an event loop or lightweight-thread runtime — Java virtual threads (Project Loom), reactive frameworks, async/await. One OS thread per core, thousands of in-flight tasks, no context-switch tax.</li>
+          </ol>
+
+          <p class="pullquote">"More workers" is not a free lever. The cost of letting them coexist eventually exceeds the work they do. Profile before doubling.</p>
+
+          <p>See: <a href="../execution/context-switching.html">context switching</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs12"><span class="num">12</span>The p99 spike that disappears with isolcpus</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        A real-time market-data pipeline has a p99 latency target of 100 µs. Most requests come in under 50 µs. The remaining 1% are spikes between 200–600 µs, clustering into bursts every few hundred milliseconds. Profiling the slow paths shows them taking massive cache misses on data that "should" be hot — the same buffer the thread was reading microseconds earlier. Adding diagnostic logging makes it worse, not better.
+      </div>
+
+      <p><strong>What's happening.</strong> The Linux scheduler is migrating the hot thread between cores. Each migration loses the L1 and L2 caches the thread was using on the previous core (per-core, not shared) plus the branch predictor's history (also per-core). The thread arrives on its new core with cold caches; the next ~50–500 µs of execution runs at a fraction of normal speed because every memory access misses into L3 or DRAM. The migrations are silent — the kernel is balancing load across cores, optimizing for global throughput while quietly destroying tail latency for this thread. The "extra 1%" the team has been chasing isn't a software bug; it's the scheduler doing its job for someone else's metric.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>CPU affinity / core pinning</dt>
+          <dd>A per-thread bitmask of cores the kernel is allowed to run that thread on. Default is "all cores"; pinning narrows it. Prevents migration across cores.</dd>
+
+          <dt>Migration</dt>
+          <dd>The scheduler moving a thread from one core to another. Direct cost is small; indirect cost (cold L1/L2, cold predictor) is a 50–500 µs slowdown after the move.</dd>
+
+          <dt>isolcpus</dt>
+          <dd>A Linux kernel boot parameter that excludes specific cores from the general-purpose scheduler. Kernel housekeeping and other threads stay off those cores; only explicitly-pinned work runs there.</dd>
+
+          <dt>NUMA</dt>
+          <dd>Non-Uniform Memory Access. On multi-socket systems, RAM is local to specific sockets; cross-socket access is ~1.5–2× slower. A migration across sockets is a cache loss <em>and</em> a memory tax.</dd>
+
+          <dt>Hyperthread sibling</dt>
+          <dd>The other hardware thread sharing a physical core with the one you pinned to. <code>lscpu -e</code> shows the topology. If you don't reserve the sibling, a noisy neighbour will fight for the core's execution units.</dd>
+
+          <dt>Tail latency</dt>
+          <dd>The slow end of the latency distribution — p99, p99.9, max. The metric users feel; medians and averages hide it. See <a href="../performance/latency-throughput.html">tail-at-scale</a>.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Take the keys back from the scheduler. Three layers of pin.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Three layers, applied together:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Pin the hot thread.</strong> Use <code>pthread_setaffinity_np</code> (C/C++), <code>os.sched_setaffinity</code> (Python), or the language equivalent to bind the latency-critical thread to a specific core, say core 4. The scheduler can no longer migrate it; cache state survives across time slices.</li>
+            <li><strong>Isolate the core.</strong> Boot with <code>isolcpus=4 nohz_full=4</code> so the kernel doesn't put any other work on core 4 — no kernel housekeeping, no other threads, no timer interrupts to interrupt the hot loop. Pin the HT sibling away too (see <code>lscpu -e</code> for the topology).</li>
+            <li><strong>Pin to the right NUMA node.</strong> On multi-socket boxes, ensure the thread's memory allocations land on the same NUMA node as the core it runs on. <code>numactl --membind=0 --cpubind=0</code> at launch, or per-allocation hints in code.</li>
+          </ol>
+
+          <p>After: p99 typically drops from 600 µs to ~80 µs. The spikes vanish entirely because the migrations stop happening. The trade-off is that core 4 is now reserved — it can't be repurposed for general work, even when the hot thread is idle.</p>
+
+          <p class="pullquote">The kernel scheduler optimizes for aggregate throughput; it doesn't know your tail-latency goal. Pinning is how you take the keys back.</p>
+
+          <p>See: <a href="../execution/core-pinning.html">core pinning</a>, <a href="../hardware/cache-locality.html">cache locality</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="wrap"><span class="num">13</span>The pattern across all twelve</h2>
+
+      <p>Twelve different scenarios, two shared shapes. The first six are about what the <em>hardware</em> is doing under your code — cache lines, branch predictors, memory layout, the difference between asymptotics and constants. The last six are about what the <em>OS</em> is doing on your behalf — isolation, scheduling, threads, the loop. The pattern across both halves: <strong>the abstraction you're using has a cost you didn't see, and the fix is almost always to make it visible.</strong></p>
+
+      <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Pressure shape over RPS.</strong> Numbers like "1M req/s" mean nothing without a per-request cost on a specific component. Find the tallest bar before you design.</li>
+        <li><strong>Layout over algorithm.</strong> Two structures with the same big-O can differ by 10× because one walks memory in cache-line order and the other doesn't.</li>
+        <li><strong>Predictability over cleverness.</strong> A loop with an unpredictable branch is slower than the same loop with extra work that makes the branch predictable.</li>
+        <li><strong>Cache-line awareness in concurrency.</strong> Threads can be logically independent and physically coupled. False sharing is invisible at the source level and devastating to throughput.</li>
+        <li><strong>Constants beat asymptotics for small n.</strong> O(n²) with a tight inner loop wins against O(n log n) with overhead, until n is big enough.</li>
+        <li><strong>Isolation lives at the process boundary.</strong> Threads share blast radius; processes don't.</li>
+        <li><strong>Count physical cores, not logical CPUs.</strong> Hardware threads aren't 2× cores for CPU-bound work.</li>
+        <li><strong>Concurrency ≠ parallelism.</strong> Async/await adds in-flight tasks, not cores. Multiprocessing or native threads add cores.</li>
+        <li><strong>Single-threaded runtimes have one rule.</strong> Never block the loop.</li>
+        <li><strong>"More threads" has a peak.</strong> Past it, throughput falls because switching, cache thrash, and lock contention compound.</li>
+        <li><strong>The kernel scheduler optimizes globally, not for your tail.</strong> When latency matters more than aggregate throughput, pin and isolate.</li>
+      </ol>
+
+      <p>The names change; the questions don't. Which component is full? Which line is hot? Which branch is biased? Where is the blast-radius boundary? Which worker is one too many? Once those become reflexes, system design at every layer feels like the same conversation.</p>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="../hardware/index.html">
+              <span class="related-arrow">→</span>
+              <span>Hardware theme</span>
+              <span class="related-summary">— pressure, memory hierarchy, cache locality (cases 1–6).</span>
+            </a>
+          </li>
+          <li>
+            <a href="../execution/index.html">
+              <span class="related-arrow">→</span>
+              <span>Execution model theme</span>
+              <span class="related-summary">— processes, threads, event loop, context switching, pinning (cases 7–12).</span>
+            </a>
+          </li>
+          <li>
+            <a href="class-03.html">
+              <span class="related-arrow">→</span>
+              <span>Class 03 case studies</span>
+              <span class="related-summary">— performance pressure where these patterns surface again.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 01 · Hardware &amp; Execution. <a href="index.html" style="color: var(--accent)">Back to case-studies hub →</a> · Drawing from Stroustrup, the SO sorted-array thread, the C10K paper, Pike's "Concurrency Is Not Parallelism," Gunicorn / Node.js / DPDK production patterns
+    </footer>
+  </body>
+</html>

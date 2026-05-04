@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TJIP Phase 02 — Glossary</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="index.html">Themes</a>
+          <a href="classes.html">Classes</a>
+          <a href="case-studies/index.html">Case Studies</a>
+          <a href="glossary.html" class="active">Glossary</a>
+        </div>
+      </div>
+    </nav>
+
+    <section class="glossary-page">
+      <header>
+        <div class="hero-eyebrow">Appendix</div>
+        <h1 style="font-family: 'Fraunces', Georgia, serif; font-weight: 300; font-size: clamp(40px, 6vw, 60px); line-height: 1.05; letter-spacing: -0.03em; margin-bottom: 16px;">
+          Glossary
+        </h1>
+        <p class="deck">
+          Every technical term referenced in the topic pages, with a short definition and back-links to the pages where
+          it's used in depth. Strict scope — only terms that actually appear in the notes.
+        </p>
+      </header>
+
+      <nav class="glossary-jumpbar" aria-label="Jump to letter">
+        <a href="#a">A</a><a href="#b">B</a><a href="#c">C</a><a href="#d">D</a><a href="#e">E</a><a href="#f">F</a>
+        <a href="#g">G</a><a href="#h">H</a><a href="#i">I</a><a href="#j">J</a><a href="#k">K</a><a href="#l">L</a>
+        <a href="#m">M</a><a href="#n">N</a><a href="#o" class="empty">O</a><a href="#p">P</a><a href="#q">Q</a><a href="#r">R</a>
+        <a href="#s">S</a><a href="#t">T</a><a href="#u" class="empty">U</a><a href="#v">V</a><a href="#w">W</a><a href="#x" class="empty">X</a>
+        <a href="#y" class="empty">Y</a><a href="#z">Z</a>
+      </nav>
+
+      <section id="a" class="glossary-letter">
+        <div class="glossary-letter-heading">A</div>
+
+        <div class="glossary-entry" id="access-latency">
+          <div class="glossary-entry-term">access latency</div>
+          <div class="glossary-entry-def">How long you wait before the <em>first</em> byte arrives. Set by the device's physics — separate from bandwidth, which is how fast bytes flow once they start.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency.html#bandwidth">Latency</a></div>
+        </div>
+
+        <div class="glossary-entry" id="aof">
+          <div class="glossary-entry-term">AOF <span class="glossary-entry-aliases">append-only file</span></div>
+          <div class="glossary-entry-def">Redis's optional durability log. Without it, Redis is an in-memory cache and is lost on restart; with it, every write is appended to disk so state can be replayed.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#ephemeral">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="aos">
+          <div class="glossary-entry-term">AoS <span class="glossary-entry-aliases">array of structs</span></div>
+          <div class="glossary-entry-def">Record-major memory layout: <code>{x,y,z,name}, {x,y,z,name}, ...</code>. Best when a loop touches all fields of one record at a time.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#locality">Cache Locality</a></div>
+        </div>
+      </section>
+
+      <section id="b" class="glossary-letter">
+        <div class="glossary-letter-heading">B</div>
+
+        <div class="glossary-entry" id="backoff">
+          <div class="glossary-entry-term">backoff</div>
+          <div class="glossary-entry-def">A retry policy where each successive attempt waits longer than the last (typically exponentially: 100 ms, 200 ms, 400 ms…). Gives the downstream room to recover and prevents busy-wait amplification.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#retries">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="bcrypt">
+          <div class="glossary-entry-term">bcrypt</div>
+          <div class="glossary-entry-def">A password-hashing function that's deliberately slow — the slowness is the security feature. The cost factor controls how many rounds; bcrypt cost 12 takes ~250 ms on a single core.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="bottleneck">
+          <div class="glossary-entry-term">bottleneck</div>
+          <div class="glossary-entry-def">The component that fills up first under load. System throughput is the bottleneck's throughput — optimizing anything else is zero-impact until you move the bottleneck.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html">Hardware Pressure</a><a href="performance/throughput.html#bottleneck">Throughput</a></div>
+        </div>
+
+        <div class="glossary-entry" id="branch-prediction">
+          <div class="glossary-entry-term">branch prediction</div>
+          <div class="glossary-entry-def">The CPU's bet on which side of an <code>if</code> will be taken, made before the condition can be computed. &gt;95% accurate on regular data; coin-flips on random data, where every miss costs a 10–20 cycle pipeline flush.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#branches">Cache Locality &amp; Branch Prediction</a></div>
+        </div>
+
+        <div class="glossary-entry" id="bulkhead">
+          <div class="glossary-entry-term">bulkhead</div>
+          <div class="glossary-entry-def">Partitioned resources (separate thread pools, connection pools, lanes) so that a failure in one downstream can't drain pools used by others. Named after the watertight walls in a ship's hull — contains a breach to one compartment.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#gateway">Resilience Patterns</a></div>
+        </div>
+      </section>
+
+      <section id="c" class="glossary-letter">
+        <div class="glossary-letter-heading">C</div>
+
+        <div class="glossary-entry" id="c10k">
+          <div class="glossary-entry-term">C10K problem</div>
+          <div class="glossary-entry-def">The late-1990s challenge of handling 10,000 concurrent connections on a single server. Killed the "thread per connection" model and drove the move to event loops and lightweight threads.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/context-switching.html#thrash">Context Switching</a></div>
+        </div>
+
+        <div class="glossary-entry" id="cache-line">
+          <div class="glossary-entry-term">cache line</div>
+          <div class="glossary-entry-def">The smallest unit of memory traffic between CPU caches and DRAM — almost universally 64 bytes. Reading one byte pulls in the surrounding 63 at the same cost.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#lines">Cache Locality</a><a href="hardware/memory-hierarchy.html">Memory Hierarchy</a><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="cache-stampede">
+          <div class="glossary-entry-term">cache stampede</div>
+          <div class="glossary-entry-def">When a hot cache key expires and many requests miss simultaneously, all hammering the database to rebuild it. Sometimes called "dog-piling." Mitigated by single-flight, probabilistic refresh, stale-while-revalidate, or TTL jitter.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#stampede">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="cdn">
+          <div class="glossary-entry-term">CDN <span class="glossary-entry-aliases">content delivery network</span></div>
+          <div class="glossary-entry-def">A network of edge servers that cache content close to viewers, spreading bandwidth and latency burden across many geographically-distributed boxes instead of one origin.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="circuit-breaker">
+          <div class="glossary-entry-term">circuit breaker</div>
+          <div class="glossary-entry-def">A wrapper around a remote call that tracks failure rate. When failures cross a threshold, the breaker "opens" and fails subsequent calls instantly (no downstream contact). After a cooldown, a probe request decides whether to close again.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#breaker">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="coherence">
+          <div class="glossary-entry-term">coherence <span class="glossary-entry-aliases">cache coherence</span></div>
+          <div class="glossary-entry-def">The property that all cores see consistent values for shared memory. Maintained by a hardware protocol that invalidates or updates other cores' cached copies whenever one core writes.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#caches">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="consensus">
+          <div class="glossary-entry-term">consensus</div>
+          <div class="glossary-entry-def">A class of distributed algorithms (Paxos, Raft, Zab) where a majority of nodes must agree before a value is committed. The basis of CP systems — minority partitions can't make progress.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#cp">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="cow">
+          <div class="glossary-entry-term">copy-on-write <span class="glossary-entry-aliases">COW</span></div>
+          <div class="glossary-entry-def">A trick that makes <code>fork()</code> cheap: pages are shared read-only between parent and child until one of them writes, at which point only that page is duplicated. Most fork-exec patterns never trigger duplication at all.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#cost">Process vs Thread</a></div>
+        </div>
+
+        <div class="glossary-entry" id="cpu-affinity">
+          <div class="glossary-entry-term">CPU affinity <span class="glossary-entry-aliases">core pinning</span></div>
+          <div class="glossary-entry-def">A per-thread bit-mask that restricts which cores the kernel scheduler can run that thread on. Pinning narrows the mask — sometimes to a single core — to keep cache state warm and avoid migration.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/core-pinning.html">Core Pinning</a></div>
+        </div>
+      </section>
+
+      <section id="d" class="glossary-letter">
+        <div class="glossary-letter-heading">D</div>
+
+        <div class="glossary-entry" id="ddr5">
+          <div class="glossary-entry-term">DDR5</div>
+          <div class="glossary-entry-def">The current generation of DRAM signalling standard. Roughly 100 GB/s of bandwidth per channel on modern server DIMMs, ~80 ns access latency.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#tiers">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="dram">
+          <div class="glossary-entry-term">DRAM <span class="glossary-entry-aliases">dynamic RAM</span></div>
+          <div class="glossary-entry-def">The main-memory tier. One transistor + one capacitor per bit; cheap and dense, but has to be periodically refreshed and lives off-chip from the CPU. ~80 ns access latency.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html">Memory Hierarchy</a><a href="hardware/cache-locality.html">Cache Locality</a></div>
+        </div>
+      </section>
+
+      <section id="e" class="glossary-letter">
+        <div class="glossary-letter-heading">E</div>
+
+        <div class="glossary-entry" id="eventual-consistency">
+          <div class="glossary-entry-term">eventual consistency</div>
+          <div class="glossary-entry-def">A consistency model where writes are accepted by any node and asynchronously replicated; replicas may diverge during a partition but converge after it heals. The default for AP systems.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#ap">CAP Theorem</a></div>
+        </div>
+      </section>
+
+      <section id="f" class="glossary-letter">
+        <div class="glossary-letter-heading">F</div>
+
+        <div class="glossary-entry" id="false-sharing">
+          <div class="glossary-entry-term">false sharing</div>
+          <div class="glossary-entry-def">When two independent variables happen to live on the same 64-byte cache line, two cores writing them appear to the coherence protocol as conflicting on a single line — and ping-pong it back and forth. Fix: pad to cache-line boundaries.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#caches">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="fsync">
+          <div class="glossary-entry-term">fsync</div>
+          <div class="glossary-entry-def">The system call that forces a write all the way to durable storage. Without it, the OS may report "done" as soon as bytes hit a buffer; <code>fsync</code> is what every database calls before acknowledging a commit. ~10–50 µs on NVMe.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a><a href="hardware/memory-hierarchy.html#ephemeral">Memory Hierarchy</a></div>
+        </div>
+      </section>
+
+      <section id="g" class="glossary-letter">
+        <div class="glossary-letter-heading">G</div>
+
+        <div class="glossary-entry" id="gil">
+          <div class="glossary-entry-term">GIL <span class="glossary-entry-aliases">Global Interpreter Lock</span></div>
+          <div class="glossary-entry-def">A runtime lock (most famously Python's) that serializes bytecode execution across threads. Threads still help for I/O-bound work because the GIL releases on syscalls, but CPU-bound parallelism requires multiple processes.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#picking">Process vs Thread</a></div>
+        </div>
+
+        <div class="glossary-entry" id="goodput">
+          <div class="glossary-entry-term">goodput</div>
+          <div class="glossary-entry-def">Throughput minus errors, retries, and duplicates — only the useful work. When a system gets slow, throughput and goodput diverge; that gap is a signal of failure amplification.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/throughput.html#units">Throughput</a></div>
+        </div>
+
+        <div class="glossary-entry" id="gossip">
+          <div class="glossary-entry-term">gossip</div>
+          <div class="glossary-entry-def">A peer-to-peer failure-detection protocol where every node periodically pings a random subset of peers and shares state. Convergent and resilient; the way most distributed clusters know who's alive.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/consistent-hashing.html#crash">Consistent Hashing</a></div>
+        </div>
+
+        <div class="glossary-entry" id="graceful-degradation">
+          <div class="glossary-entry-term">graceful degradation</div>
+          <div class="glossary-entry-def">Returning a useful but reduced response when a dependency is down — global popular list instead of personalized, "price unavailable" instead of an error page. The fallback is part of the spec, not an accident.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#graceful">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="green-thread">
+          <div class="glossary-entry-term">green thread <span class="glossary-entry-aliases">goroutine · virtual thread · fiber</span></div>
+          <div class="glossary-entry-def">A user-space thread scheduled by a language runtime onto a small pool of OS threads. Switch cost is hundreds of nanoseconds instead of microseconds. Examples: Go goroutines, Java virtual threads, async Rust tasks, Erlang processes.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#cost">Process vs Thread</a><a href="execution/context-switching.html#fix">Context Switching</a></div>
+        </div>
+      </section>
+
+      <section id="h" class="glossary-letter">
+        <div class="glossary-letter-heading">H</div>
+
+        <div class="glossary-entry" id="hash-ring">
+          <div class="glossary-entry-term">hash ring</div>
+          <div class="glossary-entry-def">A circular keyspace (typically 0 to 2<sup>32</sup>−1) where both servers and keys are placed by hash. To find a key's owner, walk clockwise from the key's position until you bump into a server.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/consistent-hashing.html#ring">Consistent Hashing</a></div>
+        </div>
+
+        <div class="glossary-entry" id="hbm">
+          <div class="glossary-entry-term">HBM <span class="glossary-entry-aliases">high-bandwidth memory</span></div>
+          <div class="glossary-entry-def">DRAM stacked vertically and bonded to the same package as the processor. Used on modern GPUs and AI accelerators. Plays the role of "main memory" in those architectures.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#tradeoffs">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="hedged-request">
+          <div class="glossary-entry-term">hedged request</div>
+          <div class="glossary-entry-def">If the first replica hasn't answered by the p95 latency, send a copy of the request to a second replica and take whichever returns first. Trades a little extra load for a dramatic improvement in tail latency.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency-throughput.html#percentiles">Latency &amp; Throughput</a></div>
+        </div>
+
+        <div class="glossary-entry" id="hls">
+          <div class="glossary-entry-term">HLS <span class="glossary-entry-aliases">HTTP Live Streaming</span></div>
+          <div class="glossary-entry-def">Apple's video-streaming protocol where a stream is broken into small (~2–10 second) MP4 chunks and a manifest lists them. Each chunk is fetched as a normal HTTP request, which lets streams flow through any HTTP CDN.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
+        </div>
+      </section>
+
+      <section id="i" class="glossary-letter">
+        <div class="glossary-letter-heading">I</div>
+
+        <div class="glossary-entry" id="idempotency">
+          <div class="glossary-entry-term">idempotency</div>
+          <div class="glossary-entry-def">A property where running the same operation twice has the same effect as running it once. Reads are naturally idempotent; mutations need an explicit idempotency key (a UUID the client generates and the server dedupes by). Precondition for safe retries.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#setting">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="iops">
+          <div class="glossary-entry-term">IOPS <span class="glossary-entry-aliases">I/O operations per second</span></div>
+          <div class="glossary-entry-def">How many discrete read/write operations a disk can sustain. A different number for sequential vs random, small vs large blocks. NVMe SSDs do hundreds of thousands; spinning disks do ~150.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#components">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="ipc">
+          <div class="glossary-entry-term">IPC <span class="glossary-entry-aliases">inter-process communication</span></div>
+          <div class="glossary-entry-def">Mechanisms for two processes to exchange data across address-space boundaries — pipes, sockets, shared memory regions, message queues. Slower than two threads sharing a pointer; that's the whole point.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#process">Process vs Thread</a></div>
+        </div>
+
+        <div class="glossary-entry" id="isolcpus">
+          <div class="glossary-entry-term">isolcpus</div>
+          <div class="glossary-entry-def">A Linux kernel boot parameter that excludes specific cores from the general scheduler's load-balancing pool. Used with <code>nohz_full</code> and pinning to dedicate cores entirely to latency-critical threads.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/core-pinning.html#tools">Core Pinning</a></div>
+        </div>
+      </section>
+
+      <section id="j" class="glossary-letter">
+        <div class="glossary-letter-heading">J</div>
+
+        <div class="glossary-entry" id="jitter">
+          <div class="glossary-entry-term">jitter</div>
+          <div class="glossary-entry-def">Randomness added to retry delays or scheduled events to prevent synchronized waves. Variants — equal, full, decorrelated — control how much randomness vs predictability you keep.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#retries">Resilience Patterns</a></div>
+        </div>
+      </section>
+
+      <section id="k" class="glossary-letter">
+        <div class="glossary-letter-heading">K</div>
+
+        <div class="glossary-entry" id="knee">
+          <div class="glossary-entry-term">knee (of the curve)</div>
+          <div class="glossary-entry-def">The point on the latency-vs-load curve where latency starts climbing steeply with small increases in offered load. Operating left of the knee is healthy; operating near it is risky.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency-throughput.html#tradeoff">Latency &amp; Throughput</a></div>
+        </div>
+      </section>
+
+      <section id="l" class="glossary-letter">
+        <div class="glossary-letter-heading">L</div>
+
+        <div class="glossary-entry" id="leaky-bucket">
+          <div class="glossary-entry-term">leaky bucket</div>
+          <div class="glossary-entry-def">A throttling algorithm: requests enter a fixed-size queue and drain out at a constant rate. Output is perfectly smooth no matter how spiky the input.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#gateway">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="libuv">
+          <div class="glossary-entry-term">libuv</div>
+          <div class="glossary-entry-def">The C library Node.js uses to implement its event loop. Handles I/O, timers, file reads, and DNS lookups across an OS-thread pool, calling back into the JS engine when results are ready.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/event-loop.html#single">The Event Loop</a></div>
+        </div>
+
+        <div class="glossary-entry" id="line-rate">
+          <div class="glossary-entry-term">line rate</div>
+          <div class="glossary-entry-def">The maximum byte throughput a network interface can sustain — the bandwidth ceiling of a NIC. A 10 Gbps NIC has a line rate of ~1.25 GB/s of payload.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#shape">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="linearizability">
+          <div class="glossary-entry-term">linearizability</div>
+          <div class="glossary-entry-def">The strictest consistency guarantee: every read sees the most recent write or an error. Operations appear to take effect at a single instant between their request and response.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#three">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="littles-law">
+          <div class="glossary-entry-term">Little's Law</div>
+          <div class="glossary-entry-def"><code>L = λ × W</code> — for any stable system, average concurrency equals arrival rate times average residence time. Three numbers; fix any two and the third is forced. The most useful equation in performance engineering.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency-throughput.html#little">Latency &amp; Throughput</a><a href="craft/back-of-envelope.html#traps">Back-of-the-Envelope</a></div>
+        </div>
+      </section>
+
+      <section id="m" class="glossary-letter">
+        <div class="glossary-letter-heading">M</div>
+
+        <div class="glossary-entry" id="macrotask">
+          <div class="glossary-entry-term">macrotask</div>
+          <div class="glossary-entry-def">A task on the JavaScript event loop's main queue — <code>setTimeout</code>, <code>setInterval</code>, I/O completions, DOM events. The loop runs exactly one macrotask per tick, then drains all microtasks.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/event-loop.html#micro">The Event Loop</a></div>
+        </div>
+
+        <div class="glossary-entry" id="mesi">
+          <div class="glossary-entry-term">MESI</div>
+          <div class="glossary-entry-def">The classic four-state cache-coherence protocol — every cache line is in one of four states: <strong>M</strong>odified, <strong>E</strong>xclusive, <strong>S</strong>hared, or <strong>I</strong>nvalid. Variants (MOESI, MESIF) add states but follow the same shape.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#caches">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="microtask">
+          <div class="glossary-entry-term">microtask</div>
+          <div class="glossary-entry-def">A higher-priority task queued by <code>Promise.then</code>, <code>queueMicrotask</code>, or <code>MutationObserver</code>. Microtasks drain entirely between every macrotask — <code>Promise.then</code> always runs before the next <code>setTimeout</code>.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/event-loop.html#micro">The Event Loop</a></div>
+        </div>
+      </section>
+
+      <section id="n" class="glossary-letter">
+        <div class="glossary-letter-heading">N</div>
+
+        <div class="glossary-entry" id="network-partition">
+          <div class="glossary-entry-term">network partition</div>
+          <div class="glossary-entry-def">When the network splits a cluster into groups that can't reach each other. Not optional in real systems — partitions happen, and CAP says you have to choose what to do during them.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#three">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="nic">
+          <div class="glossary-entry-term">NIC <span class="glossary-entry-aliases">network interface card</span></div>
+          <div class="glossary-entry-def">The physical network port. Has two distinct limits — bandwidth (Gbps) and packets-per-second — that often saturate independently.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#components">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="numa">
+          <div class="glossary-entry-term">NUMA <span class="glossary-entry-aliases">Non-Uniform Memory Access</span></div>
+          <div class="glossary-entry-def">A multi-socket architecture where DRAM is split across sockets. Local-socket access is fast (~80 ns); remote-socket access goes over the inter-socket link (~120–160 ns). Pinning keeps thread and memory on the same NUMA node.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/core-pinning.html#numa">Core Pinning</a></div>
+        </div>
+      </section>
+
+      <section id="p" class="glossary-letter">
+        <div class="glossary-letter-heading">P</div>
+
+        <div class="glossary-entry" id="pacelc">
+          <div class="glossary-entry-term">PACELC</div>
+          <div class="glossary-entry-def">Daniel Abadi's extension of CAP: if there's a <strong>P</strong>artition, choose <strong>A</strong> or <strong>C</strong>; <strong>E</strong>lse (normal operation), choose <strong>L</strong>atency or <strong>C</strong>onsistency. Captures the trade-off CAP misses — even without partitions, consistency costs latency.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#spectrum">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="page-cache">
+          <div class="glossary-entry-term">page cache</div>
+          <div class="glossary-entry-def">The kernel's RAM cache of recently-read disk pages. Why "the second read of the same file" is much faster than the first — and why a cold cache after deploy creates spikes in latency.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="pcb">
+          <div class="glossary-entry-term">PCB <span class="glossary-entry-aliases">Process Control Block</span></div>
+          <div class="glossary-entry-def">A per-thread kernel struct in RAM that holds saved registers, program counter, stack pointer, and scheduling state for a paused thread. Every context switch is a CPU↔RAM round-trip through the PCB.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#thread">Process vs Thread</a></div>
+        </div>
+
+        <div class="glossary-entry" id="peak-factor">
+          <div class="glossary-entry-term">peak factor</div>
+          <div class="glossary-entry-def">The multiplier from average load to peak load — typically ×3 for general consumer apps, ×5 for clearly diurnal workloads, ×2 for global services. You capacity-plan against peak; you bill against average.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="craft/back-of-envelope.html#method">Back-of-the-Envelope</a></div>
+        </div>
+
+        <div class="glossary-entry" id="percentile">
+          <div class="glossary-entry-term">percentile</div>
+          <div class="glossary-entry-def">A latency distribution marker: p95 = 120 ms means 95% of requests finished in ≤120 ms. p99, p99.9, p99.99 reach into the tail. Percentiles describe what users experience; averages hide the tail.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency-throughput.html#percentiles">Latency &amp; Throughput</a></div>
+        </div>
+
+        <div class="glossary-entry" id="pipeline">
+          <div class="glossary-entry-term">pipeline <span class="glossary-entry-aliases">CPU pipeline · instruction pipeline</span></div>
+          <div class="glossary-entry-def">The CPU's overlapping queue of in-flight instructions, typically 15–20 stages deep. A branch misprediction means flushing every speculative instruction, costing 10–20 cycles.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#branches">Cache Locality &amp; Branch Prediction</a></div>
+        </div>
+
+        <div class="glossary-entry" id="pps">
+          <div class="glossary-entry-term">pps <span class="glossary-entry-aliases">packets per second</span></div>
+          <div class="glossary-entry-def">The other network limit, separate from bandwidth. A 10 Gbps NIC tops out at ~1–2 million pps before per-packet OS overhead bites — so a flood of tiny requests can saturate pps long before bytes.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#components">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="preemption">
+          <div class="glossary-entry-term">preemption</div>
+          <div class="glossary-entry-def">An involuntary context switch — the kernel forcibly takes the CPU away from a running thread, typically because its time slice expired or a higher-priority thread became runnable.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/context-switching.html#voluntary">Context Switching</a></div>
+        </div>
+
+        <div class="glossary-entry" id="prefetcher">
+          <div class="glossary-entry-term">prefetcher</div>
+          <div class="glossary-entry-def">CPU hardware that watches access patterns and pulls in cache lines <em>before</em> the program asks for them. Sequential access is its happy path; random access defeats it entirely.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#locality">Cache Locality</a></div>
+        </div>
+      </section>
+
+      <section id="q" class="glossary-letter">
+        <div class="glossary-letter-heading">Q</div>
+
+        <div class="glossary-entry" id="quorum">
+          <div class="glossary-entry-term">quorum</div>
+          <div class="glossary-entry-def">The number of replicas that must acknowledge a read or write. With replication factor N, the threshold <code>R + W &gt; N</code> guarantees linearizability. Cassandra and DynamoDB tune this per query.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#ap">CAP Theorem</a></div>
+        </div>
+      </section>
+
+      <section id="r" class="glossary-letter">
+        <div class="glossary-letter-heading">R</div>
+
+        <div class="glossary-entry" id="race-condition">
+          <div class="glossary-entry-term">race condition</div>
+          <div class="glossary-entry-def">When the result of an operation depends on the unpredictable interleaving of two or more threads accessing shared state. The hazard is in contested <em>data</em>, not contested cycles — locks/atomics exist to manage it.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#thread">Process vs Thread</a></div>
+        </div>
+
+        <div class="glossary-entry" id="raft">
+          <div class="glossary-entry-term">Raft</div>
+          <div class="glossary-entry-def">A consensus algorithm designed to be more understandable than Paxos. Used by etcd, Consul, CockroachDB, TiKV, and many other modern distributed systems. Elects a leader; followers replicate the leader's log.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#cp">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="replication-factor">
+          <div class="glossary-entry-term">replication factor <span class="glossary-entry-aliases">RF</span></div>
+          <div class="glossary-entry-def">How many copies of each piece of data the cluster keeps — typically 3. Production systems also place those copies on distinct racks or availability zones so that a single rack failure doesn't take all replicas.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/consistent-hashing.html#replication">Consistent Hashing</a></div>
+        </div>
+
+        <div class="glossary-entry" id="retry-after">
+          <div class="glossary-entry-term">Retry-After</div>
+          <div class="glossary-entry-def">An HTTP header on 429 / 503 responses that tells clients exactly when to come back. Servers use it to actively shape incoming load; well-behaved clients stop retrying until the server invites them back.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#retries">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="retry-budget">
+          <div class="glossary-entry-term">retry budget</div>
+          <div class="glossary-entry-def">A fleet-wide cap on retry traffic, typically expressed as a percentage of base requests. Past the budget, retries are dropped immediately even if individual policies would allow them. The lever that actually stops storms.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#retries">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="retry-storm">
+          <div class="glossary-entry-term">retry storm</div>
+          <div class="glossary-entry-def">When clients retry failed requests aggressively against a downstream that's already overloaded, inflating offered load 2–3× exactly when capacity is shrinking. A self-inflicted denial-of-service.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#retries">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="rps">
+          <div class="glossary-entry-term">RPS · QPS · TPS</div>
+          <div class="glossary-entry-def">Requests / queries / transactions per second — the standard throughput units. Pick the one that matches what the system produces; a peak number is what you size capacity against.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/throughput.html#units">Throughput</a></div>
+        </div>
+      </section>
+
+      <section id="s" class="glossary-letter">
+        <div class="glossary-letter-heading">S</div>
+
+        <div class="glossary-entry" id="sched-setaffinity">
+          <div class="glossary-entry-term">sched_setaffinity</div>
+          <div class="glossary-entry-def">The Linux syscall that pins a thread to a subset of cores. Wrapped by <code>pthread_setaffinity_np</code> in C, <code>os.sched_setaffinity</code> in Python, etc. Per-thread; finer-grained than <code>taskset</code>.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/core-pinning.html#tools">Core Pinning</a></div>
+        </div>
+
+        <div class="glossary-entry" id="single-flight">
+          <div class="glossary-entry-term">single-flight <span class="glossary-entry-aliases">request coalescing</span></div>
+          <div class="glossary-entry-def">When many concurrent callers want the same missing thing, only one of them does the work; the others block until its answer is ready, then read it. Go's <code>singleflight</code> package is the canonical implementation.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#stampede">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="smt">
+          <div class="glossary-entry-term">SMT <span class="glossary-entry-aliases">simultaneous multi-threading · Hyper-Threading · HT</span></div>
+          <div class="glossary-entry-def">A second register file and program counter on a physical core, sharing all execution units, caches, and predictor. Two contexts in flight; ~1.2–1.4× throughput per pair on CPU-bound work, not 2×. SMT is the hardware shortcut around an OS context switch.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#core-vs-thread">Process vs Thread</a></div>
+        </div>
+
+        <div class="glossary-entry" id="soa">
+          <div class="glossary-entry-term">SoA <span class="glossary-entry-aliases">struct of arrays</span></div>
+          <div class="glossary-entry-def">Column-major memory layout: <code>x[..], y[..], z[..], name[..]</code>. Best when a loop touches one field across many records (the typical pattern in columnar databases and game engines).</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#locality">Cache Locality</a></div>
+        </div>
+
+        <div class="glossary-entry" id="spatial-locality">
+          <div class="glossary-entry-term">spatial locality</div>
+          <div class="glossary-entry-def">"If you touched address X, you'll touch X+1, X+2 soon." The property real programs have when they iterate arrays linearly. What makes prefetching pay off.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#locality">Cache Locality</a></div>
+        </div>
+
+        <div class="glossary-entry" id="speculative-execution">
+          <div class="glossary-entry-term">speculative execution</div>
+          <div class="glossary-entry-def">Running instructions on the predicted side of a branch before the branch is resolved. If the prediction is right, the work counts; if wrong, the pipeline flushes and the speculative instructions are discarded.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#branches">Cache Locality &amp; Branch Prediction</a></div>
+        </div>
+
+        <div class="glossary-entry" id="sram">
+          <div class="glossary-entry-term">SRAM <span class="glossary-entry-aliases">static RAM</span></div>
+          <div class="glossary-entry-def">Six transistors per bit, no refresh needed. Fast (~1 ns) and used for CPU caches; expensive enough that you only get megabytes of it on a chip, not gigabytes.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#why">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="stale-while-revalidate">
+          <div class="glossary-entry-term">stale-while-revalidate</div>
+          <div class="glossary-entry-def">A cache strategy that serves the stale value immediately while a single background task refreshes. No client ever waits for a cold rebuild; the cost of staleness is bounded to one refresh cycle.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#stampede">Resilience Patterns</a></div>
+        </div>
+      </section>
+
+      <section id="t" class="glossary-letter">
+        <div class="glossary-letter-heading">T</div>
+
+        <div class="glossary-entry" id="tail-at-scale">
+          <div class="glossary-entry-term">tail at scale</div>
+          <div class="glossary-entry-def">Dean &amp; Barroso's observation: in a fan-out system with N parallel calls, the page's latency is dominated by the worst tail of N. p99 of one call becomes p90 of a 10-way fan-out. Why microservices obsess over the tail.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency-throughput.html#averages">Latency &amp; Throughput</a></div>
+        </div>
+
+        <div class="glossary-entry" id="temporal-locality">
+          <div class="glossary-entry-term">temporal locality</div>
+          <div class="glossary-entry-def">"If you touched address X, you'll touch X again soon." The property real programs have when they reuse the same lookup tables and hot variables. What makes caching pay off.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#locality">Cache Locality</a></div>
+        </div>
+
+        <div class="glossary-entry" id="throttle">
+          <div class="glossary-entry-term">throttle</div>
+          <div class="glossary-entry-def">A hard cap on incoming rate or concurrency, enforced at the gateway. Past the limit, requests are rejected with <code>429 Too Many Requests</code>. Prevents overload by saying no at the door.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#gateway">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="tlb">
+          <div class="glossary-entry-term">TLB <span class="glossary-entry-aliases">translation lookaside buffer</span></div>
+          <div class="glossary-entry-def">The CPU's cache of virtual-to-physical address translations. Flushed on every cross-process context switch; misses cost ~10–100 ns each as the page-table walker re-resolves the mapping.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/context-switching.html#happens">Context Switching</a></div>
+        </div>
+
+        <div class="glossary-entry" id="token-bucket">
+          <div class="glossary-entry-term">token bucket</div>
+          <div class="glossary-entry-def">A throttling algorithm: a bucket holds up to N tokens and refills at rate R per second. Each request consumes one token; an empty bucket means rejection. Allows bursts up to N, sustains R over time.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#gateway">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="transient-failure">
+          <div class="glossary-entry-term">transient failure</div>
+          <div class="glossary-entry-def">A failure that succeeds if you try again, with no human intervention — a dropped TCP packet, a brief partition, a process restarting. Distinct from permanent failures (malformed request, missing record) which won't get better.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#setting">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="tunable-consistency">
+          <div class="glossary-entry-term">tunable consistency</div>
+          <div class="glossary-entry-def">A database feature where the consistency level is set per-query rather than per-cluster. Cassandra's <code>ONE</code> / <code>QUORUM</code> / <code>ALL</code> are the canonical example.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#ap">CAP Theorem</a></div>
+        </div>
+      </section>
+
+      <section id="v" class="glossary-letter">
+        <div class="glossary-letter-heading">V</div>
+
+        <div class="glossary-entry" id="vector-clock">
+          <div class="glossary-entry-term">vector clock</div>
+          <div class="glossary-entry-def">A per-node counter array used to track causal ordering of writes across a distributed system. AP systems use vector clocks (or variants) to detect and resolve conflicts when partitions heal.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#ap">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="vnode">
+          <div class="glossary-entry-term">vnode <span class="glossary-entry-aliases">virtual node</span></div>
+          <div class="glossary-entry-def">A position marker on a hash ring. Each physical server plants 150–256 vnodes scattered around the ring; the data still lives on one disk per server, but the small slices average out to balanced load and graceful failover. <em>Not</em> the same as a ZooKeeper znode.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/consistent-hashing.html#vnodes">Consistent Hashing</a></div>
+        </div>
+
+        <div class="glossary-entry" id="volatility-line">
+          <div class="glossary-entry-term">volatility line</div>
+          <div class="glossary-entry-def">The boundary in the memory hierarchy between memory that survives a power cut (SSD, HDD, tape) and memory that doesn't (registers, cache, DRAM). The most consequential place to ask "what does this system actually have if power dies right now?"</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#ephemeral">Memory Hierarchy</a></div>
+        </div>
+      </section>
+
+      <section id="w" class="glossary-letter">
+        <div class="glossary-letter-heading">W</div>
+
+        <div class="glossary-entry" id="wal">
+          <div class="glossary-entry-term">WAL <span class="glossary-entry-aliases">write-ahead log</span></div>
+          <div class="glossary-entry-def">A durable log written before a change is applied to its data structures. Every commit appends to the WAL and <code>fsync</code>s it, then the change is replayed onto the main store; the design lets a crashed database recover by re-reading the log.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
+        </div>
+
+        <div class="glossary-entry" id="web-worker">
+          <div class="glossary-entry-term">Web Worker · worker_threads</div>
+          <div class="glossary-entry-def">A separate OS thread with its own JavaScript context and event loop, communicating with the main thread by message-passing (no shared state). True parallelism for browser/Node.js JS — used for genuinely heavy CPU work that would otherwise block the loop.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/event-loop.html#blocking">The Event Loop</a></div>
+        </div>
+
+        <div class="glossary-entry" id="working-set">
+          <div class="glossary-entry-term">working set</div>
+          <div class="glossary-entry-def">The bytes a workload actually touches in a window of time — the part of memory that has to fit in the fast tier for the program to run at speed. If it spills out of L2, every iteration eats DRAM latency; if out of DRAM, the program crashes or starts swapping.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html">Hardware Pressure</a><a href="hardware/memory-hierarchy.html">Memory Hierarchy</a></div>
+        </div>
+      </section>
+
+      <section id="z" class="glossary-letter">
+        <div class="glossary-letter-heading">Z</div>
+
+        <div class="glossary-entry" id="znode">
+          <div class="glossary-entry-term">znode</div>
+          <div class="glossary-entry-def">An entry in ZooKeeper's filesystem-shaped tree. Two flags change behaviour: <strong>ephemeral</strong> (auto-deleted when the client disconnects) and <strong>sequential</strong> (appended with a globally-unique monotonic suffix). The chained-watch leader-election recipe uses both. <em>Not</em> the same as a vnode.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#sync">Resilience Patterns</a></div>
+        </div>
+      </section>
+    </section>
+
+    <footer class="site-footer">
+      Strict scope: only terms that appear in the topic pages. New entries land as each theme is rewritten.
+    </footer>
+  </body>
+</html>
