@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="../styles.css" />
   </head>
-  <body>
+  <body data-base="../">
     <nav class="site-nav">
       <div class="site-nav-inner">
         <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
@@ -22,16 +22,20 @@
           <a href="../case-studies/index.html">Case Studies</a>
           <a href="../glossary.html">Glossary</a>
         </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
       </div>
     </nav>
 
     <section class="theme-page">
       <header class="theme-header">
         <div class="eyebrow">Theme 03 — Distribution</div>
-        <h1>State across <em>machines</em>.</h1>
+        <h1>State (and traffic) across <em>machines</em>.</h1>
         <p class="deck">
-          Once data outgrows one box, every choice is a trade-off. Where does each key live? What happens when the
-          network splits the cluster in two? This theme is the vocabulary for those answers.
+          Once data outgrows one box, every choice is a trade-off. Where does each key live? Where does each request
+          go? What happens when the network splits the cluster in two? This theme is the vocabulary for those answers.
         </p>
       </header>
 
@@ -53,11 +57,39 @@
           </div>
           <span class="row-arrow">→</span>
         </a>
+
+        <a href="dns-resolution.html" class="topic-row">
+          <span class="row-pill">Class 04</span>
+          <div class="row-body">
+            <h3>DNS Resolution</h3>
+            <p>The five-layer cache hierarchy, recursive vs authoritative, A vs CNAME, and the two CNAME rules that bite people.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="dns-ttl-and-change.html" class="topic-row">
+          <span class="row-pill">Class 04</span>
+          <div class="row-body">
+            <h3>DNS TTL & Cutovers</h3>
+            <p>How to change a record without breaking users for hours: the four-phase playbook, dig commands, and the gotchas it doesn't fix.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="api-gateway-pipeline.html" class="topic-row">
+          <span class="row-pill">Class 04</span>
+          <div class="row-body">
+            <h3>The API Gateway Pipeline</h3>
+            <p>Gateway → auth → rate limit → routing → load balancer → reverse proxy → server. Each stage explained, and why the order matters.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
       </div>
     </section>
 
     <footer class="site-footer">
       Theme 03 of 06. <a href="../execution/index.html" style="color: var(--accent)">← Execution</a> · <a href="../performance/index.html" style="color: var(--accent)">Next: Performance →</a>
     </footer>
+    <script src="../search.js" defer></script>
   </body>
 </html>

@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DNS TTL & Cutovers — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Distribution</a></div>
+        <h1>DNS <em>TTL</em> & cutovers</h1>
+        <p class="deck">How to change a DNS record without leaving users stranded for hours — the four-phase playbook, the dig commands that prove it worked, and the gotchas that bite you anyway.</p>
+        <div class="meta">
+          <span class="class-pill">Class 04</span>
+          <span>Theme · Distribution</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#lease">TTL is a lease — and who sets it</a></li>
+          <li><a href="#why">Why naive changes break</a></li>
+          <li><a href="#cname-ttls">Two TTLs when a CNAME is involved</a></li>
+          <li><a href="#playbook">The four-phase playbook</a></li>
+          <li><a href="#dig">Verifying with <code>dig</code></a></li>
+          <li><a href="#tradeoff">The low-vs-high TTL trade-off</a></li>
+          <li><a href="#gotchas">Gotchas the playbook doesn't fix</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">DNS is a giant distributed cache. The hardest problem in any cache is <em>invalidation</em> — telling every cached copy that the answer just changed. DNS doesn't try to push invalidations across the internet. Instead, every record carries a <a class="glink" href="../glossary.html#ttl">TTL</a> — a deadline after which caches must re-fetch — and the whole system relies on those deadlines expiring to move stale answers out of circulation.</p>
+
+      <p>That single design choice is the source of every "I changed my DNS but half my users still see the old IP" story. Understanding how to change a record well is, at heart, understanding how to manipulate that cache window before, during, and after the change.</p>
+
+      <h2 id="lease"><span class="num">01</span>TTL is a lease — and who sets it</h2>
+
+      <p>Every DNS record carries a TTL in seconds. When a resolver caches the record, that TTL is how long it's allowed to keep using the cached answer before re-asking the authoritative server. After expiry, the next query re-fetches. Until expiry, the cached answer is what gets served — <strong>even if the authoritative answer has already changed.</strong></p>
+
+      <p>That last sentence is the whole story of DNS propagation delay.</p>
+
+      <h3>Who sets the TTL</h3>
+
+      <p>The <strong>zone administrator</strong> — i.e., whoever owns the domain — sets the TTL on each record at the authoritative server. It's not a global system parameter; it's a per-record value baked into the record itself. When you edit a record at Cloudflare / Route 53 / Namecheap, the TTL field next to "value" is what you're setting.</p>
+
+      <p>Two extra knobs live at the zone level rather than the record level:</p>
+
+      <ul>
+        <li>The zone's <code>SOA</code> record carries a <strong>default TTL</strong> that records inherit if not specified explicitly.</li>
+        <li>The <code>SOA</code> also carries a <strong>negative-cache TTL</strong> (the <code>MINIMUM</code> field) that controls how long <code>NXDOMAIN</code> answers are cached. This is the clock that bites you if a record briefly disappears during a botched cutover.</li>
+      </ul>
+
+      <p>Resolvers and clients are <em>expected</em> to honour the configured TTL — but with caveats. Some recursive resolvers floor very low values (refusing TTLs below 30 or 60 s); some clients (Chrome, certain JVM versions) cap very high values; and the browser, OS, and router caches all sit between the authority and the user, each with its own enforcement. The configured TTL is your <em>intent</em>; what actually happens in any given cache is a negotiation between that intent and whatever implementation is reading it.</p>
+
+      <h2 id="why"><span class="num">02</span>Why naive changes break</h2>
+
+      <p>You're moving <code>api.example.com</code> from one IP to another. You edit the record at your DNS provider and wait. What happens?</p>
+
+      <ul>
+        <li>The authoritative server now serves the new IP.</li>
+        <li>Every <a class="glink" href="../glossary.html#recursive-resolver">recursive resolver</a> that already cached the old IP <em>keeps serving the old IP</em> for up to its full TTL.</li>
+        <li>If the steady-state TTL was <code>86400</code> (24 h), some users won't see the new IP for a full day.</li>
+      </ul>
+
+      <p>That's the bug. The fix is to make the cache window small <em>before</em> you change anything, do the change inside that small window, then make the window large again once it's stable. Four phases.</p>
+
+      <h2 id="cname-ttls"><span class="num">03</span>Two TTLs when a CNAME is involved</h2>
+
+      <p>The bug above was about <em>one</em> record's TTL. The picture gets more interesting when the name resolves through a <a class="glink" href="../glossary.html#cname">CNAME</a> chain, because every record on the chain has <strong>its own TTL</strong> — and those clocks tick independently.</p>
+
+      <p>Concrete example. Your blog is hosted on a managed service:</p>
+
+      <div class="codeblock"><code>blog.example.com.    3600    IN    CNAME    target.cloud.com.
+target.cloud.com.    60      IN    A        192.0.2.42</code></div>
+
+      <p>A resolver doing a fresh lookup gets back <em>both</em> records and caches each independently. Their TTLs apply separately:</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — Two clocks on a CNAME chain</div>
+        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+          <!-- blog.example.com -->
+          <rect x="20" y="80" width="180" height="50" rx="4" fill="var(--paper-warm)" stroke="var(--s4)" stroke-width="2"/>
+          <text x="110" y="103" text-anchor="middle" class="svg-text-bold">blog.example.com</text>
+          <text x="110" y="120" text-anchor="middle" class="svg-text-small" fill="var(--muted)">CNAME record</text>
+
+          <!-- arrow with label -->
+          <line x1="200" y1="105" x2="240" y2="105" stroke="var(--s4)" stroke-width="1.5"/>
+          <polygon points="237,102 242,105 237,108" fill="var(--s4)"/>
+
+          <!-- target.cloud.com -->
+          <rect x="240" y="80" width="170" height="50" rx="4" fill="var(--paper-warm)" stroke="var(--s2)" stroke-width="2"/>
+          <text x="325" y="103" text-anchor="middle" class="svg-text-bold">target.cloud.com</text>
+          <text x="325" y="120" text-anchor="middle" class="svg-text-small" fill="var(--muted)">A record</text>
+
+          <line x1="410" y1="105" x2="450" y2="105" stroke="var(--s2)" stroke-width="1.5"/>
+          <polygon points="447,102 452,105 447,108" fill="var(--s2)"/>
+
+          <!-- IP -->
+          <rect x="450" y="80" width="170" height="50" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="535" y="108" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">192.0.2.42</text>
+
+          <!-- TTL clock 1 (long) -->
+          <circle cx="110" cy="180" r="22" fill="none" stroke="var(--s4)" stroke-width="2"/>
+          <line x1="110" y1="180" x2="110" y2="162" stroke="var(--s4)" stroke-width="2"/>
+          <line x1="110" y1="180" x2="124" y2="186" stroke="var(--s4)" stroke-width="2"/>
+          <text x="150" y="178" class="svg-text-bold" fill="var(--s4)">TTL = 3600 s</text>
+          <text x="150" y="194" class="svg-text-small" fill="var(--muted)">your CNAME</text>
+
+          <!-- TTL clock 2 (short) -->
+          <circle cx="325" cy="180" r="22" fill="none" stroke="var(--s2)" stroke-width="2"/>
+          <line x1="325" y1="180" x2="325" y2="162" stroke="var(--s2)" stroke-width="2"/>
+          <line x1="325" y1="180" x2="335" y2="180" stroke="var(--s2)" stroke-width="2"/>
+          <text x="365" y="178" class="svg-text-bold" fill="var(--s2)">TTL = 60 s</text>
+          <text x="365" y="194" class="svg-text-small" fill="var(--muted)">provider's A</text>
+
+          <text x="20" y="40" class="svg-text-small" fill="var(--muted)">two records, two clocks, expiring independently</text>
+        </svg>
+        <p class="figure-caption">The CNAME at <code>blog.example.com</code> and the A record at <code>target.cloud.com</code> are cached separately. The A's clock ticks fast; the CNAME's clock ticks slowly. Each refresh only re-fetches the link that expired.</p>
+      </div>
+
+      <h3>Independent expiry, independent refresh</h3>
+
+      <p>After 60 s the A record at <code>target.cloud.com</code> is stale and the resolver re-fetches <em>just</em> the A — it still knows from cache that <code>blog.example.com</code> is an alias of <code>target.cloud.com</code>. Only when the CNAME's 3600 s elapses does the resolver re-walk the whole chain.</p>
+
+      <h3>What this means in practice</h3>
+
+      <ul>
+        <li><strong>Changing the IP that the target points to</strong> propagates within the <em>target's</em> TTL (60 s). The CNAME doesn't have to expire — caches will pick up the new A on its next refresh.</li>
+        <li><strong>Changing where the CNAME points</strong> (different target altogether) propagates within the <em>CNAME's</em> TTL (3600 s). The new target's A record is irrelevant to a cache that hasn't refreshed the CNAME yet.</li>
+        <li><strong>For any change that requires re-walking the full chain, the slowest TTL bounds your cutover.</strong></li>
+      </ul>
+
+      <h3>Why managed services love this shape</h3>
+
+      <p>This split-clock behaviour is the architectural reason CNAMEs to managed services work so well:</p>
+
+      <ul>
+        <li>Heroku, AWS ELB, Cloudflare, Vercel set <strong>very low TTLs (~60 s) on their A records</strong>, so they can rotate IPs at will without coordinating with customers.</li>
+        <li>You set a <strong>longer TTL (1 h or more) on your CNAME</strong>, because you rarely change <em>which provider</em> you point at — only which IPs that provider rotates through.</li>
+        <li>End-user resolution is cheap (one CNAME lookup per hour) but the provider can still move IPs in a minute. Both sides win without negotiating.</li>
+      </ul>
+
+      <p class="pullquote">Each link in the chain has its own clock — only the link you change starts ticking.</p>
+
+      <h2 id="playbook"><span class="num">04</span>The four-phase playbook</h2>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — TTL across the four phases</div>
+        <svg viewBox="0 0 640 280" xmlns="http://www.w3.org/2000/svg">
+          <!-- baseline -->
+          <line x1="40" y1="220" x2="600" y2="220" stroke="var(--rule)" stroke-width="1"/>
+
+          <!-- Phase 1: TTL=86400 (high) -->
+          <line x1="40" y1="60" x2="160" y2="60" stroke="var(--s1)" stroke-width="2.5"/>
+          <line x1="40" y1="60" x2="40" y2="220" stroke="var(--s1)" stroke-width="1" stroke-dasharray="2,2"/>
+          <line x1="160" y1="60" x2="160" y2="220" stroke="var(--s1)" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="100" y="50" text-anchor="middle" class="svg-text-small" fill="var(--s1)">TTL = 86400</text>
+
+          <!-- Phase 2: TTL drops to 60 but waits one OLD ttl  -->
+          <line x1="160" y1="200" x2="320" y2="200" stroke="var(--s4)" stroke-width="2.5"/>
+          <line x1="320" y1="200" x2="320" y2="220" stroke="var(--s4)" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="240" y="190" text-anchor="middle" class="svg-text-small" fill="var(--s4)">TTL = 60 · wait one old TTL</text>
+
+          <!-- Phase 3: change moment -->
+          <circle cx="320" cy="200" r="6" fill="var(--accent)"/>
+          <text x="320" y="170" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">change!</text>
+
+          <!-- Phase 3 continued: TTL=60, propagation -->
+          <line x1="320" y1="200" x2="430" y2="200" stroke="var(--s4)" stroke-width="2.5"/>
+          <line x1="430" y1="200" x2="430" y2="220" stroke="var(--s4)" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="375" y="215" text-anchor="middle" class="svg-text-small" fill="var(--s4)">propagate</text>
+
+          <!-- Phase 4: TTL back to 86400 -->
+          <line x1="430" y1="60" x2="600" y2="60" stroke="var(--s1)" stroke-width="2.5"/>
+          <line x1="430" y1="60" x2="430" y2="200" stroke="var(--s1)" stroke-width="1" stroke-dasharray="2,2"/>
+          <text x="515" y="50" text-anchor="middle" class="svg-text-small" fill="var(--s1)">TTL = 86400</text>
+
+          <!-- Phase labels along bottom -->
+          <text x="100" y="245" text-anchor="middle" class="svg-text-small" fill="var(--muted)">steady state</text>
+          <text x="240" y="245" text-anchor="middle" class="svg-text-small" fill="var(--muted)">phase 1 — pre-lower</text>
+          <text x="375" y="265" text-anchor="middle" class="svg-text-small" fill="var(--muted)">phase 2 + 3</text>
+          <text x="515" y="245" text-anchor="middle" class="svg-text-small" fill="var(--muted)">phase 4 — restore</text>
+
+          <!-- vertical "TTL" axis label -->
+          <text x="20" y="60" class="svg-text-small" fill="var(--muted)">86400</text>
+          <text x="20" y="205" class="svg-text-small" fill="var(--muted)">60</text>
+          <text x="14" y="135" class="svg-text-small" fill="var(--muted)" transform="rotate(-90 14 135)">TTL (s)</text>
+
+          <!-- disruption window highlight -->
+          <rect x="320" y="30" width="110" height="14" fill="var(--accent)" opacity="0.2"/>
+          <text x="375" y="42" text-anchor="middle" class="svg-text-small" fill="var(--accent)">disruption ≤ 60s</text>
+        </svg>
+        <p class="figure-caption">The procedure spans many hours, but the user-visible disruption window — the time between the change and global propagation — is bounded by the new low TTL, not the old one.</p>
+      </div>
+
+      <h3>Phase 1 — Pre-lower the TTL, then wait one <em>old</em> TTL</h3>
+
+      <p>Drop the record's TTL to a small value (60 s is the convention; 30 s is fine; 300 s is the cautious upper bound). Then <strong>wait at least one full old TTL</strong>.</p>
+
+      <p>The waiting step is the one that gets skipped, and it's the one that matters. Here's why: a resolver that cached the record yesterday saw the old TTL of 86400, and it will hold that record for up to 24 h regardless of what you change at the authority <em>today</em>. Lowering the TTL only affects caches that re-fetch <em>after</em> the lowering. So you have to wait long enough for every existing cached copy to expire and be re-fetched with the new low TTL.</p>
+
+      <p>After this phase, every resolver in the world is holding a copy that says "good for 60 s." Your cache window has shrunk from a day to a minute.</p>
+
+      <h3>Phase 2 — Change the record, verify against authority</h3>
+
+      <p>Update the record at the authoritative server. Immediately confirm the change landed by querying the authoritative server <em>directly</em> — this bypasses every cache:</p>
+
+      <div class="codeblock"><code>dig api.example.com @ns1.example.com +short
+# → 198.51.100.42      (the new IP)</code></div>
+
+      <p>If the authority reports the new IP, the change is real. Public resolvers will still show the old IP for up to the new low TTL (~60 s) — that's expected, not a bug.</p>
+
+      <h3>Phase 3 — Wait one new TTL, then verify propagation</h3>
+
+      <p>Wait at least the new low TTL period. Every cache that holds a stale copy will refresh on its next request and pick up the new IP. Spot-check with multiple public resolvers to confirm global propagation:</p>
+
+      <div class="codeblock"><code>for ns in 8.8.8.8 1.1.1.1 9.9.9.9 208.67.222.222; do
+  echo -n "$ns → "; dig api.example.com @$ns +short
+done</code></div>
+
+      <p>If they all return the new IP, propagation is done.</p>
+
+      <h3>Phase 4 — Raise the TTL back up</h3>
+
+      <p>Once the change is stable (give it longer than the bare minimum — an hour is a comfortable cushion), raise the TTL back to its steady-state value (typical: 1 h to 24 h). Why bother:</p>
+
+      <ul>
+        <li>Low TTL means every cache re-fetches every minute, so your authoritative servers carry roughly <code>TTL_old / TTL_new</code> times the query load they had before. For a 1-day → 60 s drop that's a <strong>1440× multiplier</strong>.</li>
+        <li>First-hit users at each cache pay the full recursion cost (root → TLD → authoritative) on every expiry — bad p99 for cold paths.</li>
+        <li>Raising back is hygiene: low TTL is for cutovers, not for steady state.</li>
+      </ul>
+
+      <h3>A concrete timeline</h3>
+
+      <div style="margin: 24px 0 32px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper-warm); overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 13.5px;">
+          <thead><tr style="background: var(--paper); border-bottom: 1px solid var(--rule);">
+            <th style="text-align: left; padding: 14px 18px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);">Time</th>
+            <th style="text-align: left; padding: 14px 18px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);">Action</th>
+            <th style="text-align: left; padding: 14px 18px; font-weight: 600; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent);">What caches hold</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <td style="padding: 12px 18px; font-family: 'JetBrains Mono', monospace; color: var(--muted);">T−25 h</td>
+              <td style="padding: 12px 18px;">Steady state. TTL = 86400.</td>
+              <td style="padding: 12px 18px; color: var(--muted);">old IP, ≤ 24 h</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <td style="padding: 12px 18px; font-family: 'JetBrains Mono', monospace; color: var(--muted);">T−24 h</td>
+              <td style="padding: 12px 18px;">Lower TTL to 60 (nothing else changes yet).</td>
+              <td style="padding: 12px 18px; color: var(--muted);">old IP, ≤ 24 h</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <td style="padding: 12px 18px; font-family: 'JetBrains Mono', monospace; color: var(--muted);">T−0</td>
+              <td style="padding: 12px 18px;">24 h has passed. Every cache holds TTL = 60.</td>
+              <td style="padding: 12px 18px; color: var(--muted);">old IP, ≤ 60 s</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <td style="padding: 12px 18px; font-family: 'JetBrains Mono', monospace; color: var(--accent);">T−0</td>
+              <td style="padding: 12px 18px; color: var(--accent);"><strong>Change the IP.</strong> Verify with <code>dig @ns1</code>.</td>
+              <td style="padding: 12px 18px; color: var(--muted);">old IP, ≤ 60 s</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--rule);">
+              <td style="padding: 12px 18px; font-family: 'JetBrains Mono', monospace; color: var(--muted);">T+60 s</td>
+              <td style="padding: 12px 18px;">Caches refresh. Spot-check public resolvers.</td>
+              <td style="padding: 12px 18px; color: var(--s2);">new IP, ≤ 60 s</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 18px; font-family: 'JetBrains Mono', monospace; color: var(--muted);">T+1 h</td>
+              <td style="padding: 12px 18px;">Stable. Raise TTL back to 86400.</td>
+              <td style="padding: 12px 18px; color: var(--s2);">new IP, ≤ 24 h</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The whole thing takes ~25 hours wall-clock for a 1-day TTL, but the <em>user-visible disruption window</em> is bounded by the new low TTL — about a minute.</p>
+
+      <h2 id="dig"><span class="num">05</span>Verifying with <code>dig</code></h2>
+
+      <p>After changing a record you want to answer two different questions, and they need different tools:</p>
+
+      <ol>
+        <li><strong>Did the authoritative server accept my change?</strong> Query the authoritative server <em>directly</em>, bypassing every cache.</li>
+        <li><strong>Has the change propagated to the rest of the world yet?</strong> Query a public resolver and watch its TTL count down.</li>
+      </ol>
+
+      <p><a class="glink" href="../glossary.html#dig">dig</a> is the standard tool. The invocations worth memorising:</p>
+
+      <div class="codeblock"><code># Default — uses the system resolver, just like a browser would
+dig www.example.com
+
+# Just the answer, nothing else
+dig www.example.com +short
+
+# Ask a specific resolver (Google's public DNS in this case)
+dig www.example.com @8.8.8.8
+
+# Ask the authoritative server DIRECTLY — bypasses every cache.
+# This is the move for "did my change actually land?"
+dig www.example.com @ns1.example.com
+
+# Show the full recursion: root → TLD → authoritative
+dig www.example.com +trace
+
+# Specific record types
+dig example.com NS        # who's authoritative for this zone
+dig example.com MX        # mail servers
+dig example.com TXT       # SPF / DKIM / verification
+dig example.com SOA       # zone metadata (TTL defaults, serial number)</code></div>
+
+      <h3>The "is my change live?" workflow</h3>
+
+      <div class="codeblock"><code># 1. Find the zone's authoritative nameservers.
+dig example.com NS +short
+# → ns1.example.com.
+#   ns2.example.com.
+
+# 2. Ask one of them directly. If this returns the new value, your DNS provider
+#    has accepted the change. (No cache between you and the source of truth.)
+dig www.example.com @ns1.example.com +short
+
+# 3. Now ask a public resolver. If this still shows the old value, the change
+#    is real but caches are still serving stale data. Watch the TTL count down
+#    on repeated queries — when it hits 0 the next query will refetch.
+dig www.example.com @8.8.8.8</code></div>
+
+      <p class="pullquote">The only way to know the truth is to ask the authoritative server.</p>
+
+      <p>Every other answer is some cache's opinion, and might be minutes or hours behind. If you skip step 2 and panic-debug from step 3 only, you'll waste an afternoon thinking your change didn't go through when really it just hadn't propagated yet.</p>
+
+      <h3>Reading dig output</h3>
+
+      <div class="codeblock"><code>;; ANSWER SECTION:
+www.example.com.    287    IN    A    93.184.216.34
+                    ^^^
+                    TTL remaining in seconds</code></div>
+
+      <p>The TTL shown is what the <em>resolver you queried</em> has left on its cached copy — it counts down on repeated queries. Hit 0 and the next query refetches from upstream. Querying the authoritative server shows the <em>full configured TTL</em> (because there's no cache between you and the source).</p>
+
+      <p>Alternatives: <code>nslookup</code> (older, more terse output) and <code>host</code> (simpler, less info). <code>dig</code> is the one to learn — it's what every DNS doc and incident-runbook will assume.</p>
+
+      <h2 id="tradeoff"><span class="num">06</span>The low-vs-high TTL trade-off</h2>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Low TTL (60 s)</h4>
+          <p>Fast propagation — good for cutovers and failover. But every cache re-fetches frequently, so authoritative-server load goes up and first-hit users at every cache pay the full recursion cost.</p>
+        </div>
+        <div class="card">
+          <h4>High TTL (24 h)</h4>
+          <p>Slow propagation — cutovers take forever. But most queries are served from cache, authoritative load is minimal, and end-user resolution is sub-millisecond.</p>
+        </div>
+      </div>
+
+      <p>The common shape: keep TTL high during steady state (1–24 h), drop it to 30–60 s before a planned change, raise it again after. Steady state optimises for serving; pre-lower optimises for changing.</p>
+
+      <h2 id="gotchas"><span class="num">07</span>Gotchas the playbook doesn't fix</h2>
+
+      <ul>
+        <li><strong>Long-lived connections pin to the old IP.</strong> DNS resolution happens at <em>connect</em> time only. WebSockets, gRPC streams, and HTTP/2 keepalive connections that opened before the change keep talking to the old IP until they reconnect. <strong>Run both IPs in parallel during the cutover</strong> — don't tear down the old one the moment the DNS change goes in.</li>
+        <li><strong>Some clients ignore TTL.</strong> Chrome caps DNS TTL at ~60 s regardless of what you set; some Java clients cache DNS for the JVM lifetime by default (<code>networkaddress.cache.ttl</code>); some load balancers and SDKs do their own DNS pinning. Low TTL is a hint, not a guarantee.</li>
+        <li><strong>Some recursive resolvers floor the TTL.</strong> A resolver may refuse to respect TTLs below 30 s or 60 s. You can't make global propagation faster than the slowest resolver in the chain.</li>
+        <li><strong>Negative caching is its own clock.</strong> If the record briefly disappears (NXDOMAIN), that absence is also cached, governed by the SOA's <code>MINIMUM</code> field, not your record's TTL. A botched intermediate state can poison caches for hours. Never delete-then-recreate; always replace in place.</li>
+        <li><strong>OS-level caches need manual flushing during debugging.</strong> <code>sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder</code> on macOS, <code>sudo systemd-resolve --flush-caches</code> on Linux, <code>ipconfig /flushdns</code> on Windows. Useful for <em>you</em>, not for users.</li>
+      </ul>
+
+      <h2 id="takeaway"><span class="num">08</span>The one-line takeaway</h2>
+
+      <p class="pullquote">A DNS change is bounded by whatever TTL was in effect when caches picked up the previous answer — pre-lowering is how you shrink that bound before you need it.</p>
+
+      <p>Everything else — the wait, the dig commands, the four phases — is just the discipline of moving the cache window before, during, and after the cutover. Skip the pre-lower and the change still happens, but users notice it for as long as the steady-state TTL allows. Get the discipline right and a global IP migration becomes a one-minute event nobody sees.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#ttl">TTL</a><a href="../glossary.html#recursive-resolver">recursive resolver</a><a href="../glossary.html#authoritative-dns">authoritative DNS</a><a href="../glossary.html#dig">dig</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="dns-resolution.html">
+              <span class="related-arrow">→</span>
+              <span>DNS Resolution</span>
+              <span class="related-summary">— the cache hierarchy this whole playbook is manipulating.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../reliability/resilience-patterns.html">
+              <span class="related-arrow">→</span>
+              <span>Resilience Patterns</span>
+              <span class="related-summary">— the same TTL-based-pull idea recurs at every cache layer.</span>
+            </a>
+          </li>
+          <li>
+            <a href="api-gateway-pipeline.html">
+              <span class="related-arrow">→</span>
+              <span>API Gateway Pipeline</span>
+              <span class="related-summary">— the next layer of caching, one tier closer to the server.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 04 · Distribution. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>

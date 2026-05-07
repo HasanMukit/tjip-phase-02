@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body data-base="">
     <nav class="site-nav">
       <div class="site-nav-inner">
         <a href="index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
@@ -21,6 +21,10 @@
           <a href="classes.html">Classes</a>
           <a href="case-studies/index.html">Case Studies</a>
           <a href="glossary.html" class="active">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
         </div>
       </div>
     </nav>
@@ -52,6 +56,36 @@
           <div class="glossary-entry-term">access latency</div>
           <div class="glossary-entry-def">How long you wait before the <em>first</em> byte arrives. Set by the device's physics — separate from bandwidth, which is how fast bytes flow once they start.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency.html#bandwidth">Latency</a></div>
+        </div>
+
+        <div class="glossary-entry" id="a-record">
+          <div class="glossary-entry-term">A record</div>
+          <div class="glossary-entry-def">A DNS record that maps a name directly to an IPv4 address — the terminal answer in a resolution chain. <code>AAAA</code> is the same shape for IPv6.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#a-vs-cname">DNS Resolution</a></div>
+        </div>
+
+        <div class="glossary-entry" id="alias-record">
+          <div class="glossary-entry-term">ALIAS record <span class="glossary-entry-aliases">ANAME · CNAME flattening</span></div>
+          <div class="glossary-entry-def">A provider-side trick (Route 53 ALIAS, Cloudflare CNAME flattening, DNSimple ALIAS, NS1 ANAME) that lets you point an apex domain at another name. The provider resolves the target at query time and serves the resulting IPs as a real <code>A</code> record, sidestepping the rule that the apex can't be a CNAME.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#cname-rules">DNS Resolution</a></div>
+        </div>
+
+        <div class="glossary-entry" id="api-gateway">
+          <div class="glossary-entry-term">API gateway</div>
+          <div class="glossary-entry-def">A single public endpoint that fronts many backend services and centralises cross-cutting concerns: authentication, rate limiting, routing, observability, API versioning. Backends sit behind it as plain services. Common implementations: Kong, AWS API Gateway, Apigee, Envoy, Tyk.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#gateway">The API Gateway Pipeline</a></div>
+        </div>
+
+        <div class="glossary-entry" id="apex">
+          <div class="glossary-entry-term">apex <span class="glossary-entry-aliases">root domain · naked domain · zone apex</span></div>
+          <div class="glossary-entry-def">The zone name itself — <code>example.com</code>, not <code>www.example.com</code>. The apex must carry mandatory <code>SOA</code> and <code>NS</code> records, which is why you can't put a CNAME there: CNAME refuses to coexist with any other record.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#cname-rules">DNS Resolution</a></div>
+        </div>
+
+        <div class="glossary-entry" id="authoritative-dns">
+          <div class="glossary-entry-term">authoritative DNS <span class="glossary-entry-aliases">authoritative name server</span></div>
+          <div class="glossary-entry-def">The name server that holds the actual zone file — the source of truth for some slice of names. Doesn't recurse; just answers definitively about its own zone. Distinct from a <em>recursive resolver</em>, which is a cache that walks the authoritative chain on the client's behalf.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#recursive-vs-authoritative">DNS Resolution</a><a href="distribution/dns-ttl-and-change.html#dig">DNS TTL &amp; Cutovers</a></div>
         </div>
 
         <div class="glossary-entry" id="aof">
@@ -128,6 +162,12 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
         </div>
 
+        <div class="glossary-entry" id="cname">
+          <div class="glossary-entry-term">CNAME <span class="glossary-entry-aliases">canonical name</span></div>
+          <div class="glossary-entry-def">A DNS record that aliases one name to another. Resolvers follow the chain (CNAME → CNAME → … → A) until they reach a terminal record. Two rules: a name with a CNAME can have <em>no other records</em>, and the apex can't be a CNAME (because <code>SOA</code> and <code>NS</code> are required there).</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#a-vs-cname">DNS Resolution</a></div>
+        </div>
+
         <div class="glossary-entry" id="circuit-breaker">
           <div class="glossary-entry-term">circuit breaker</div>
           <div class="glossary-entry-def">A wrapper around a remote call that tracks failure rate. When failures cross a threshold, the breaker "opens" and fails subsequent calls instantly (no downstream contact). After a cooldown, a probe request decides whether to close again.</div>
@@ -168,6 +208,18 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#tiers">Memory Hierarchy</a></div>
         </div>
 
+        <div class="glossary-entry" id="dig">
+          <div class="glossary-entry-term">dig</div>
+          <div class="glossary-entry-def">The standard DNS lookup tool. <code>dig name</code> uses the system resolver; <code>dig name @8.8.8.8</code> queries a specific resolver; <code>dig name @ns1.example.com</code> queries an authoritative server directly, bypassing every cache — the move for "did my change actually land?". <code>+short</code> trims the output; <code>+trace</code> shows the full recursion.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-ttl-and-change.html#dig">DNS TTL &amp; Cutovers</a></div>
+        </div>
+
+        <div class="glossary-entry" id="dns">
+          <div class="glossary-entry-term">DNS <span class="glossary-entry-aliases">Domain Name System</span></div>
+          <div class="glossary-entry-def">The internet's name-to-IP translation system, structured as a tree of authoritative servers fronted by a forest of caches. A query falls through five cache layers (browser, OS, router, recursive resolver, authoritative) — the first non-expired copy wins.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html">DNS Resolution</a><a href="distribution/dns-ttl-and-change.html">DNS TTL &amp; Cutovers</a></div>
+        </div>
+
         <div class="glossary-entry" id="dram">
           <div class="glossary-entry-term">DRAM <span class="glossary-entry-aliases">dynamic RAM</span></div>
           <div class="glossary-entry-def">The main-memory tier. One transistor + one capacitor per bit; cheap and dense, but has to be periodically refreshed and lives off-chip from the CPU. ~80 ns access latency.</div>
@@ -192,6 +244,12 @@
           <div class="glossary-entry-term">false sharing</div>
           <div class="glossary-entry-def">When two independent variables happen to live on the same 64-byte cache line, two cores writing them appear to the coherence protocol as conflicting on a single line — and ping-pong it back and forth. Fix: pad to cache-line boundaries.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#caches">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="forward-proxy">
+          <div class="glossary-entry-term">forward proxy</div>
+          <div class="glossary-entry-def">A proxy that sits in front of <em>clients</em> and represents them to destination servers — the mirror image of a reverse proxy. Common uses: corporate egress filtering, outbound caching, audit/DLP logging, anonymity / IP masking (Tor, VPN), and geo-routing. Mnemonic: forward proxy hides the client; reverse proxy hides the server.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#forward-proxy">The API Gateway Pipeline</a></div>
         </div>
 
         <div class="glossary-entry" id="fsync">
@@ -343,6 +401,12 @@
           <div class="glossary-entry-def"><code>L = λ × W</code> — for any stable system, average concurrency equals arrival rate times average residence time. Three numbers; fix any two and the third is forced. The most useful equation in performance engineering.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="performance/latency-throughput.html#little">Latency &amp; Throughput</a><a href="craft/back-of-envelope.html#traps">Back-of-the-Envelope</a></div>
         </div>
+
+        <div class="glossary-entry" id="load-balancer">
+          <div class="glossary-entry-term">load balancer <span class="glossary-entry-aliases">L4 LB · L7 LB</span></div>
+          <div class="glossary-entry-def">A box that spreads requests across the N instances of a single service. <strong>L4</strong> balances at the transport layer (TCP packets, 5-tuple hash) — fast and protocol-agnostic. <strong>L7</strong> parses HTTP and balances by URL, header, or cookie — slower but content-aware. Algorithms: round-robin, least-connections, least-response-time, consistent-hashing, weighted.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#dispatch">The API Gateway Pipeline</a></div>
+        </div>
       </section>
 
       <section id="m" class="glossary-letter">
@@ -472,6 +536,18 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#cp">CAP Theorem</a></div>
         </div>
 
+        <div class="glossary-entry" id="rate-limiting">
+          <div class="glossary-entry-term">rate limiting</div>
+          <div class="glossary-entry-def">Capping how many requests a given identity (user, API key, IP) can issue per window. Two purposes: fairness (one tenant can't starve others) and defense (cap the cost of abuse or DoS). Lives at the gateway because the gateway sees every request — putting it deeper means costs are paid before the limit kicks in. Common algorithms: token bucket, leaky bucket, fixed-window, sliding-window log.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#gates">The API Gateway Pipeline</a></div>
+        </div>
+
+        <div class="glossary-entry" id="recursive-resolver">
+          <div class="glossary-entry-term">recursive resolver</div>
+          <div class="glossary-entry-def">A DNS resolver that, on a cache miss, walks the authoritative chain on the client's behalf — root → TLD → authoritative — and caches every step on the way back. Examples: <code>8.8.8.8</code> (Google), <code>1.1.1.1</code> (Cloudflare), your ISP's resolver. Distinct from an <em>authoritative server</em>, which doesn't recurse but holds the actual zone file.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#recursion">DNS Resolution</a><a href="distribution/dns-ttl-and-change.html">DNS TTL &amp; Cutovers</a></div>
+        </div>
+
         <div class="glossary-entry" id="replication-factor">
           <div class="glossary-entry-term">replication factor <span class="glossary-entry-aliases">RF</span></div>
           <div class="glossary-entry-def">How many copies of each piece of data the cluster keeps — typically 3. Production systems also place those copies on distinct racks or availability zones so that a single rack failure doesn't take all replicas.</div>
@@ -494,6 +570,12 @@
           <div class="glossary-entry-term">retry storm</div>
           <div class="glossary-entry-def">When clients retry failed requests aggressively against a downstream that's already overloaded, inflating offered load 2–3× exactly when capacity is shrinking. A self-inflicted denial-of-service.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#retries">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="reverse-proxy">
+          <div class="glossary-entry-term">reverse proxy</div>
+          <div class="glossary-entry-def">A box that sits in front of one or more backend servers and pretends to be the server to the client. Three jobs always show up here: <strong>TLS termination</strong> (decrypt at the edge), <strong>compression</strong> (gzip/Brotli), and <strong>caching</strong> (serve repeat responses without touching the backend). Often the same physical process as the load balancer (NGINX, Envoy, HAProxy), but the role is distinct: balancing spreads load, proxying wraps it.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#proxy">The API Gateway Pipeline</a></div>
         </div>
 
         <div class="glossary-entry" id="rps">
@@ -576,6 +658,12 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#gateway">Resilience Patterns</a></div>
         </div>
 
+        <div class="glossary-entry" id="tls-termination">
+          <div class="glossary-entry-term">TLS termination</div>
+          <div class="glossary-entry-def">Decrypting incoming HTTPS at the reverse proxy and talking plain HTTP (or re-encrypted HTTP) to the backend. Centralises certificate management, removes TLS CPU from every backend, and makes content-aware routing possible — you can't inspect or route by URL while the bytes are still encrypted.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#proxy">The API Gateway Pipeline</a></div>
+        </div>
+
         <div class="glossary-entry" id="tlb">
           <div class="glossary-entry-term">TLB <span class="glossary-entry-aliases">translation lookaside buffer</span></div>
           <div class="glossary-entry-def">The CPU's cache of virtual-to-physical address translations. Flushed on every cross-process context switch; misses cost ~10–100 ns each as the page-table walker re-resolves the mapping.</div>
@@ -592,6 +680,12 @@
           <div class="glossary-entry-term">transient failure</div>
           <div class="glossary-entry-def">A failure that succeeds if you try again, with no human intervention — a dropped TCP packet, a brief partition, a process restarting. Distinct from permanent failures (malformed request, missing record) which won't get better.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#setting">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="ttl">
+          <div class="glossary-entry-term">TTL <span class="glossary-entry-aliases">time to live</span></div>
+          <div class="glossary-entry-def">A per-record cache lease, in seconds. After expiry the resolver must re-fetch from upstream; until expiry the cached answer is what gets served — even if the authoritative answer has already changed. The whole story of DNS propagation delay is "TTL hasn't expired yet."</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#hierarchy">DNS Resolution</a><a href="distribution/dns-ttl-and-change.html#lease">DNS TTL &amp; Cutovers</a></div>
         </div>
 
         <div class="glossary-entry" id="tunable-consistency">
@@ -659,5 +753,6 @@
     <footer class="site-footer">
       Strict scope: only terms that appear in the topic pages. New entries land as each theme is rewritten.
     </footer>
+    <script src="search.js" defer></script>
   </body>
 </html>

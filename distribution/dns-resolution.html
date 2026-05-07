@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DNS Resolution — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Distribution</a></div>
+        <h1>DNS <em>resolution</em></h1>
+        <p class="deck">What actually happens between hitting Enter on <code>www.google.com</code> and a packet leaving the machine — told as a walk through five layers of cache.</p>
+        <div class="meta">
+          <span class="class-pill">Class 04</span>
+          <span>Theme · Distribution</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#problem">Names go in, IPs come out</a></li>
+          <li><a href="#hierarchy">The five-layer cache hierarchy</a></li>
+          <li><a href="#recursion">The recursive walk</a></li>
+          <li><a href="#recursive-vs-authoritative">Recursive vs authoritative — the distinction to nail</a></li>
+          <li><a href="#a-vs-cname">A and CNAME — the two records you'll set 99% of the time</a></li>
+          <li><a href="#cname-rules">Two CNAME rules that trip people up</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">You type <code>www.google.com</code> and hit Enter. The address bar gave you a <em>name</em>, but the network only knows how to route <em>IP addresses</em>. Something has to translate one to the other before a single byte can leave the machine. That something is <a class="glink" href="../glossary.html#dns">DNS</a> — the largest distributed cache on the planet.</p>
+
+      <p>It's distributed because no single server could answer queries for every name on the internet. It's a cache because, even if such a server existed, asking it on every page load would melt it under traffic. So DNS is layered: every level keeps a copy, every level can answer if it has one, and only on a miss does the question travel to the next level up.</p>
+
+      <h2 id="problem"><span class="num">01</span>Names go in, IPs come out</h2>
+
+      <p>Computers route packets using IP addresses (<code>142.250.190.36</code>). Humans don't remember those. We remember names (<code>google.com</code>). DNS is the agreement that translates the human-readable thing into the machine-routable thing — and it does so without any single server having to know the answer for every name.</p>
+
+      <p>The clever part isn't the translation itself. It's the architecture: a tree of <a class="glink" href="../glossary.html#authoritative-dns">authoritative servers</a> at the top (each owning some slice of names) and a forest of caches below them that remember answers so the top doesn't get overwhelmed. When the system works well, your laptop never asks the authoritative server at all — somebody nearby already knows.</p>
+
+      <h2 id="hierarchy"><span class="num">02</span>The five-layer cache hierarchy</h2>
+
+      <p>A DNS query walks down a staircase of caches. The first layer that holds a non-expired copy answers immediately and the rest are never touched. Listed in the order the browser tries them:</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The cache hierarchy</div>
+        <svg viewBox="0 0 640 460" xmlns="http://www.w3.org/2000/svg">
+          <!-- request arrow on left -->
+          <text x="40" y="30" class="svg-text-bold" fill="var(--accent)">request</text>
+          <line x1="60" y1="40" x2="60" y2="430" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="3,3" opacity="0.6"/>
+          <polygon points="56,425 60,435 64,425" fill="var(--accent)" opacity="0.6"/>
+
+          <!-- Layer 1: Browser -->
+          <rect x="120" y="35" width="380" height="56" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="135" y="58" class="svg-text-bold" fill="var(--s1)">1 · Browser cache</text>
+          <text x="135" y="78" class="svg-text-muted">in-process; chrome://net-internals/#dns</text>
+          <text x="540" y="68" class="svg-text-small" fill="var(--muted)">~ms</text>
+
+          <!-- Layer 2: OS -->
+          <rect x="120" y="103" width="380" height="56" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="135" y="126" class="svg-text-bold" fill="var(--s2)">2 · OS stub resolver</text>
+          <text x="135" y="146" class="svg-text-muted">mDNSResponder / systemd-resolved · /etc/hosts wins first</text>
+          <text x="540" y="136" class="svg-text-small" fill="var(--muted)">~ms</text>
+
+          <!-- Layer 3: Router -->
+          <rect x="120" y="171" width="380" height="56" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="135" y="194" class="svg-text-bold" fill="var(--s3)">3 · Router cache</text>
+          <text x="135" y="214" class="svg-text-muted">home/office DNS forwarder, one hop on the LAN</text>
+          <text x="540" y="204" class="svg-text-small" fill="var(--muted)">~1 ms</text>
+
+          <!-- Layer 4: Recursive -->
+          <rect x="120" y="239" width="380" height="56" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="135" y="262" class="svg-text-bold" fill="var(--s4)">4 · Recursive resolver</text>
+          <text x="135" y="282" class="svg-text-muted">8.8.8.8 / 1.1.1.1 — actually does the recursion</text>
+          <text x="540" y="272" class="svg-text-small" fill="var(--muted)">~10 ms</text>
+
+          <!-- Layer 5: Authoritative -->
+          <rect x="120" y="307" width="380" height="100" rx="4" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="135" y="330" class="svg-text-bold" fill="var(--accent)">5 · Authoritative servers</text>
+          <text x="135" y="350" class="svg-text-muted">root . → .com TLD → ns1.google.com</text>
+          <text x="135" y="372" class="svg-text" fill="var(--ink)">the only layer that knows the truth</text>
+          <text x="135" y="392" class="svg-text-muted">everyone above is a cache of its words</text>
+          <text x="540" y="360" class="svg-text-small" fill="var(--muted)">~50–100 ms</text>
+
+          <!-- short-circuit arrows on right -->
+          <text x="555" y="20" class="svg-text-small" fill="var(--muted)">hit?</text>
+          <path d="M 530 60 Q 570 60 580 30 Q 590 10 600 30" fill="none" stroke="var(--s2)" stroke-width="1.5" opacity="0.7"/>
+          <polygon points="596,28 600,18 604,28" fill="var(--s2)" opacity="0.7"/>
+          <text x="608" y="32" class="svg-text-small" fill="var(--s2)">return</text>
+
+          <text x="40" y="450" class="svg-text-small" fill="var(--muted)">↓ each miss falls through to the next layer ↓</text>
+        </svg>
+        <p class="figure-caption">A query falls through layers 1–4 (your local caches) until something hits or the recursive resolver has to do real work. Only on a full miss do the authoritative servers see traffic at all.</p>
+      </div>
+
+      <ol>
+        <li><strong>Browser cache.</strong> Chrome, Firefox, Safari each keep an in-memory DNS cache scoped to the browser process. View Chrome's at <code>chrome://net-internals/#dns</code>. Lifetime is bounded by the record's <a class="glink" href="../glossary.html#ttl">TTL</a>, with browser-imposed caps (Chrome historically clamps to ~60 s).</li>
+        <li><strong>OS stub resolver.</strong> Every OS ships a tiny resolver that consults <code>/etc/hosts</code> first (a static override file) and otherwise caches answers. macOS calls it <code>mDNSResponder</code>; Linux is typically <code>systemd-resolved</code> or <code>nscd</code>; Windows has the DNS Client service.</li>
+        <li><strong>Router cache.</strong> Your home or office router runs a tiny DNS forwarder/cache. The first device on the LAN to resolve a name pays the cost; every other device on the network reads it from the router for free.</li>
+        <li><strong>Recursive resolver.</strong> Your ISP's resolver, or a public one like Google's <code>8.8.8.8</code>, Cloudflare's <code>1.1.1.1</code>, Quad9's <code>9.9.9.9</code>. This is the box that <em>actually walks the authoritative chain</em> on your behalf. It's also the deepest cache outside your machine.</li>
+        <li><strong>Authoritative servers.</strong> The nameservers that own the zone. Root (<code>.</code>) points at TLD servers; <code>.com</code> TLD points at the authoritative servers for <code>google.com</code>; those finally answer. Only this layer is the source of truth.</li>
+      </ol>
+
+      <p>The hierarchy exists because if every page load did the full root → TLD → authoritative dance, the root servers would melt and every request would pay tens of milliseconds in network round-trips. Caching turns the common case (popular names, repeat visits) into a sub-millisecond local memory read.</p>
+
+      <h2 id="recursion"><span class="num">03</span>The recursive walk</h2>
+
+      <p>When the query finally reaches a recursive resolver that doesn't have the answer cached, it does the actual work of finding it — and the structure of that work is its own little hierarchy.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Recursive resolution of <code>www.google.com</code></div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <!-- Resolver -->
+          <rect x="20" y="120" width="120" height="80" rx="4" fill="var(--paper-warm)" stroke="var(--s4)" stroke-width="2"/>
+          <text x="80" y="150" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">recursive</text>
+          <text x="80" y="170" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">resolver</text>
+          <text x="80" y="188" text-anchor="middle" class="svg-text-small" fill="var(--muted)">(8.8.8.8)</text>
+
+          <!-- Root -->
+          <rect x="220" y="20" width="160" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="300" y="44" text-anchor="middle" class="svg-text-bold">root servers (.)</text>
+          <text x="300" y="64" text-anchor="middle" class="svg-text-small" fill="var(--muted)">a.root-servers.net …</text>
+
+          <!-- TLD -->
+          <rect x="220" y="130" width="160" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="300" y="154" text-anchor="middle" class="svg-text-bold">.com TLD</text>
+          <text x="300" y="174" text-anchor="middle" class="svg-text-small" fill="var(--muted)">a.gtld-servers.net …</text>
+
+          <!-- Authoritative -->
+          <rect x="220" y="240" width="160" height="60" rx="4" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="300" y="264" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">authoritative</text>
+          <text x="300" y="284" text-anchor="middle" class="svg-text-small" fill="var(--muted)">ns1.google.com</text>
+
+          <!-- Arrows: out queries -->
+          <path d="M 140 145 Q 180 100 220 50" fill="none" stroke="var(--s1)" stroke-width="1.5"/>
+          <polygon points="217,53 222,46 224,55" fill="var(--s1)"/>
+          <text x="155" y="100" class="svg-text-small" fill="var(--s1)">1. who serves .com?</text>
+
+          <path d="M 140 160 L 220 160" fill="none" stroke="var(--s1)" stroke-width="1.5"/>
+          <polygon points="217,156 224,160 217,164" fill="var(--s1)"/>
+          <text x="148" y="155" class="svg-text-small" fill="var(--s1)">2. google.com NS?</text>
+
+          <path d="M 140 175 Q 180 220 220 270" fill="none" stroke="var(--s1)" stroke-width="1.5"/>
+          <polygon points="217,267 224,272 219,275" fill="var(--s1)"/>
+          <text x="148" y="245" class="svg-text-small" fill="var(--s1)">3. www.google.com A?</text>
+
+          <!-- Answer arrow back -->
+          <path d="M 380 270 Q 480 200 480 100 Q 480 30 410 60" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.6"/>
+          <text x="490" y="160" class="svg-text-small" fill="var(--accent)">→ 142.250.190.36</text>
+
+          <!-- back to client -->
+          <path d="M 80 200 L 80 240" fill="none" stroke="var(--s4)" stroke-width="1.5"/>
+          <polygon points="76,237 80,247 84,237" fill="var(--s4)"/>
+          <text x="20" y="262" class="svg-text-small" fill="var(--s4)">cache + return</text>
+          <text x="20" y="278" class="svg-text-small" fill="var(--s4)">to client</text>
+        </svg>
+        <p class="figure-caption">The resolver asks root "who runs .com?", asks the .com TLD "who runs google.com?", asks google.com's authoritative server "what's www.google.com?" — three hops to reach the answer, then caches every step on the way back.</p>
+      </div>
+
+      <p>Three queries, three answers, then the IP propagates back. The resolver caches all three intermediate results — the root NS, the .com NS, and the final A record — each with its own TTL. Next time someone asks for any other <code>.com</code> name, the resolver already knows the TLD; next time anyone asks for any other <code>google.com</code> subdomain, it already knows the authoritative server.</p>
+
+      <h2 id="recursive-vs-authoritative"><span class="num">04</span>Recursive vs authoritative — the distinction to nail</h2>
+
+      <p>This is the single most important confusion to clear up about DNS.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Recursive resolver — the worker</h4>
+          <p>Knows nothing on its own. Its job is to <em>find</em> the answer by asking root → TLD → authoritative in sequence, then cache the result so it can answer faster next time. Examples: <code>8.8.8.8</code>, <code>1.1.1.1</code>, your ISP's resolver.</p>
+        </div>
+        <div class="card">
+          <h4>Authoritative server — the source</h4>
+          <p>Holds the actual zone file. Doesn't recurse on anyone's behalf; just answers "this is what I know about my zone" — definitively. Run by whoever owns the domain (or by their DNS provider, like Cloudflare or Route 53).</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">The common misconception</div>
+        "Isn't <code>8.8.8.8</code> authoritative for the internet?" No. It's a recursive resolver with a huge cache. Authority is per-zone — every zone has its own authoritative servers, and only those servers can definitively answer about names in that zone. <code>8.8.8.8</code> is just the most popular cache between you and them.
+      </div>
+
+      <h2 id="a-vs-cname"><span class="num">05</span>A and CNAME — the two records you'll set 99% of the time</h2>
+
+      <p>DNS has many record types — <code>NS</code> (who's authoritative for this zone), <code>MX</code> (mail servers), <code>TXT</code> (free-form, used for SPF / DKIM / domain verification), <code>SOA</code> (zone metadata) — but the two you'll touch most often when configuring a service are <a class="glink" href="../glossary.html#a-record">A</a> and <a class="glink" href="../glossary.html#cname">CNAME</a>.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 03 — A vs CNAME</div>
+        <svg viewBox="0 0 640 240" xmlns="http://www.w3.org/2000/svg">
+          <!-- A record column -->
+          <text x="160" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">A record — terminal</text>
+
+          <rect x="40" y="50" width="240" height="50" rx="4" fill="var(--paper-warm)" stroke="var(--s2)"/>
+          <text x="160" y="72" text-anchor="middle" class="svg-text-bold">www.example.com</text>
+          <text x="160" y="90" text-anchor="middle" class="svg-text-small" fill="var(--muted)">name</text>
+
+          <path d="M 160 100 L 160 130" fill="none" stroke="var(--s2)" stroke-width="1.5"/>
+          <polygon points="156,127 160,137 164,127" fill="var(--s2)"/>
+
+          <rect x="40" y="140" width="240" height="50" rx="4" fill="var(--paper-warm)" stroke="var(--s2)"/>
+          <text x="160" y="162" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">93.184.216.34</text>
+          <text x="160" y="180" text-anchor="middle" class="svg-text-small" fill="var(--muted)">IP — the answer</text>
+
+          <text x="160" y="220" text-anchor="middle" class="svg-text-small" fill="var(--muted)">one hop, done</text>
+
+          <!-- divider -->
+          <line x1="320" y1="20" x2="320" y2="220" stroke="var(--rule)" stroke-dasharray="3,3"/>
+
+          <!-- CNAME column -->
+          <text x="480" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">CNAME — alias</text>
+
+          <rect x="360" y="50" width="240" height="40" rx="4" fill="var(--paper-warm)" stroke="var(--s4)"/>
+          <text x="480" y="74" text-anchor="middle" class="svg-text-bold">blog.example.com</text>
+
+          <path d="M 480 90 L 480 110" fill="none" stroke="var(--s4)" stroke-width="1.5"/>
+          <polygon points="476,107 480,117 484,107" fill="var(--s4)"/>
+
+          <rect x="360" y="118" width="240" height="40" rx="4" fill="var(--paper-warm)" stroke="var(--s4)"/>
+          <text x="480" y="142" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">example.wordpress.com</text>
+
+          <path d="M 480 158 L 480 178" fill="none" stroke="var(--s4)" stroke-width="1.5"/>
+          <polygon points="476,175 480,185 484,175" fill="var(--s4)"/>
+
+          <rect x="360" y="186" width="240" height="32" rx="4" fill="var(--paper-warm)" stroke="var(--s2)"/>
+          <text x="480" y="206" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">192.0.2.42</text>
+        </svg>
+        <p class="figure-caption">An A record terminates — name maps directly to IP. A CNAME hands you another <em>name</em> instead, which the resolver must now resolve. The chain ends only when something terminal (A or AAAA) appears.</p>
+      </div>
+
+      <p><strong>A record — name → IP.</strong> The terminal answer. <code>www.example.com → 93.184.216.34</code>. The resolver hands this straight to the browser and the connection is made. (<code>AAAA</code> is the same idea for IPv6 — different record type because the address shape is different.)</p>
+
+      <p><strong>CNAME — name → another name.</strong> An <em>alias</em>. <code>blog.example.com → example.wordpress.com</code>. The resolver doesn't get an IP back; it gets <em>another name</em>, which it must now resolve. Resolvers follow the chain (CNAME → CNAME → … → A) until they land on a terminal record.</p>
+
+      <p>The mental model: an A record is a street address; a CNAME is a "see also" pointer to a different listing. Phonebooks allow both — but with rules.</p>
+
+      <h2 id="cname-rules"><span class="num">06</span>Two CNAME rules that trip people up</h2>
+
+      <h3>Rule 1 — A name with a CNAME can have <em>no other records</em></h3>
+
+      <p>If <code>blog.example.com</code> has a CNAME, it cannot also have an A, MX, TXT, or anything else. RFC 1034 §3.6.2 makes the CNAME exclusive at its name (with a small DNSSEC carve-out).</p>
+
+      <p>The reason is semantic, not arbitrary. CNAME means "this name <em>is</em> that other name — go ask there for everything." If you also defined an MX record locally, the resolver wouldn't know whether to honor the local MX or follow the alias and ask the target's MX. The spec resolves the ambiguity by forbidding it.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 04 — Why CNAME is exclusive</div>
+        <svg viewBox="0 0 640 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- The name -->
+          <rect x="240" y="30" width="160" height="40" rx="4" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="320" y="55" text-anchor="middle" class="svg-text-bold">blog.example.com</text>
+
+          <!-- CNAME branch -->
+          <path d="M 280 70 L 160 130" fill="none" stroke="var(--s4)" stroke-width="1.5"/>
+          <polygon points="163,128 156,133 161,127" fill="var(--s4)"/>
+          <rect x="40" y="135" width="240" height="40" rx="4" fill="var(--paper-warm)" stroke="var(--s4)"/>
+          <text x="160" y="160" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">CNAME → wordpress.com</text>
+          <text x="160" y="195" text-anchor="middle" class="svg-text-small" fill="var(--muted)">"go ask there for everything"</text>
+
+          <!-- MX branch -->
+          <path d="M 360 70 L 480 130" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <polygon points="477,127 484,132 480,135" fill="var(--accent)"/>
+          <rect x="360" y="135" width="240" height="40" rx="4" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <text x="480" y="160" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">MX → mail.example.com</text>
+          <text x="480" y="195" text-anchor="middle" class="svg-text-small" fill="var(--accent)">forbidden — ambiguous!</text>
+        </svg>
+        <p class="figure-caption">Which wins — follow the alias to wordpress.com's mail server, or use the locally-defined MX? The spec sidesteps the question by banning the second record entirely.</p>
+      </div>
+
+      <p>This is why "I added a TXT record for domain verification but my CNAME stopped working" is a recurring help-desk ticket. The TXT silently breaks the CNAME (or vice versa, depending on the provider's enforcement).</p>
+
+      <h3>Rule 2 — You cannot CNAME the apex</h3>
+
+      <p>The <a class="glink" href="../glossary.html#apex">apex</a> (or "root", or "naked domain") is the zone name itself — <code>example.com</code>, not <code>www.example.com</code>. By DNS rules, the apex must carry mandatory records: at minimum SOA (zone metadata) and NS (who's authoritative). These are required by the protocol — they're how the rest of DNS finds your zone at all.</p>
+
+      <p>Combine that with Rule 1 (CNAME excludes everything) and the contradiction is direct: a CNAME at the apex would have to coexist with the required SOA and NS records, which the spec forbids. So the apex cannot be a CNAME, full stop.</p>
+
+      <p>This is annoying in practice, because hosted services (Heroku, Netlify, Vercel, S3 static sites) typically tell you "point a CNAME at <code>myapp.herokudns.com</code>." That works for <code>www.myapp.com</code> but not for <code>myapp.com</code> itself.</p>
+
+      <div class="callout">
+        <div class="callout-label">The workaround providers invented</div>
+        <strong>Route 53 ALIAS</strong>, <strong>Cloudflare CNAME flattening</strong>, <strong>DNSimple ALIAS</strong>, <strong>NS1 ANAME</strong> — all variants of the same trick. The provider resolves the target name <em>at query time</em> and serves the resulting IPs as a real <a class="glink" href="../glossary.html#alias-record">A record</a>. To the configurer it feels like "a CNAME at the apex"; on the wire it's a perfectly legal A record. The provider eats the indirection cost so the standard doesn't have to bend.
+      </div>
+
+      <p>Short answer to "why can't I just CNAME my root domain?" — <strong>because SOA and NS are required at the apex, and CNAME refuses to share a name with anything else.</strong></p>
+
+      <h2 id="takeaway"><span class="num">07</span>The one-line takeaway</h2>
+
+      <p class="pullquote">DNS is a giant tree of caches sitting in front of a small set of authoritative servers — every layer answers if it can, and only the truth at the top gets the last word.</p>
+
+      <p>Once you internalize this shape, every other DNS topic — TTL, propagation delay, the ALIAS workaround, why your <code>/etc/hosts</code> override worked instantly while your provider's record change took an hour — becomes a question of <em>which cache layer is involved</em>. The architecture is the explanation.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#dns">DNS</a><a href="../glossary.html#authoritative-dns">authoritative DNS</a><a href="../glossary.html#recursive-resolver">recursive resolver</a><a href="../glossary.html#ttl">TTL</a><a href="../glossary.html#a-record">A record</a><a href="../glossary.html#cname">CNAME</a><a href="../glossary.html#apex">apex</a><a href="../glossary.html#alias-record">ALIAS record</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="dns-ttl-and-change.html">
+              <span class="related-arrow">→</span>
+              <span>DNS TTL & Cutovers</span>
+              <span class="related-summary">— how to change a record without breaking users for hours.</span>
+            </a>
+          </li>
+          <li>
+            <a href="api-gateway-pipeline.html">
+              <span class="related-arrow">→</span>
+              <span>API Gateway Pipeline</span>
+              <span class="related-summary">— what happens to the request after DNS hands you an IP.</span>
+            </a>
+          </li>
+          <li>
+            <a href="consistent-hashing.html">
+              <span class="related-arrow">→</span>
+              <span>Consistent Hashing</span>
+              <span class="related-summary">— another distributed system whose whole job is "where does X live?"</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 04 · Distribution. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>

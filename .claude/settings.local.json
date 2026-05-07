@@ -14,7 +14,22 @@
       "WebFetch(domain:tactiq.io)",
       "WebFetch(domain:blog.bytebytego.com)",
       "WebFetch(domain:colin-scott.github.io)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(git -C /Users/rakibulhasan/Desktop/personal/practice/tjip/tjip-phase-02 remote -v)",
+      "Bash(git -C /Users/rakibulhasan/Desktop/personal/practice/tjip/tjip-phase-02 branch -a)",
+      "Bash(git rm *)",
+      "Bash(python3 *)",
+      "Bash(node *)",
+      "Bash(curl -s -o /dev/null -w \"GET / -> %{http_code}\\\\n\" http://localhost:8765/)",
+      "Bash(curl -s -o /dev/null -w \"GET /search.js -> %{http_code}\\\\n\" http://localhost:8765/search.js)",
+      "Bash(curl -s -o /dev/null -w \"GET /search-index.json -> %{http_code}\\\\n\" http://localhost:8765/search-index.json)",
+      "Bash(curl -s -o /dev/null -w \"GET /distribution/cap-theorem.html -> %{http_code}\\\\n\" http://localhost:8765/distribution/cap-theorem.html)",
+      "Bash(curl -s http://localhost:8765/search-index.json)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"localhost:8765\")",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

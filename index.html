@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body data-base="">
     <nav class="site-nav">
       <div class="site-nav-inner">
         <a href="index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
@@ -21,6 +21,10 @@
           <a href="classes.html">Classes</a>
           <a href="case-studies/index.html">Case Studies</a>
           <a href="glossary.html">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
         </div>
       </div>
     </nav>
@@ -38,11 +42,11 @@
           Themes
         </div>
         <div>
-          <span class="stat-value">16</span>
+          <span class="stat-value">19</span>
           Topic pages
         </div>
         <div>
-          <span class="stat-value">03</span>
+          <span class="stat-value">04</span>
           Classes covered
         </div>
       </div>
@@ -77,13 +81,13 @@
 
         <a href="distribution/index.html" class="theme-card">
           <div class="theme-card-num">03 — Distribution</div>
-          <div class="theme-card-title">State spread across machines</div>
+          <div class="theme-card-title">State and traffic across machines</div>
           <div class="theme-card-summary">
-            Consistent hashing for placement, the CAP theorem for the trade-offs forced on any system that stores state
-            on more than one box.
+            Consistent hashing and CAP for data placement. DNS, TTL cutovers, and the API gateway pipeline for how a
+            request actually reaches a server in a distributed system.
           </div>
           <div class="theme-card-meta">
-            <span>2 topics</span><span>Class 02</span>
+            <span>5 topics</span><span>Class 02 + 04</span>
           </div>
         </a>
 
@@ -128,5 +132,6 @@
       TJIP Phase 02 — System Design Notes<br />
       Theme-first topic index.
     </footer>
+    <script src="search.js" defer></script>
   </body>
 </html>

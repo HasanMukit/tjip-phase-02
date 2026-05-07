@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body data-base="">
     <nav class="site-nav">
       <div class="site-nav-inner">
         <a href="index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
@@ -21,6 +21,10 @@
           <a href="classes.html" class="active">Classes</a>
           <a href="case-studies/index.html">Case Studies</a>
           <a href="glossary.html">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
         </div>
       </div>
     </nav>
@@ -35,7 +39,7 @@
     </section>
 
     <section class="classes-section">
-      <div class="section-title">Classes 01 — 03</div>
+      <div class="section-title">Classes 01 — 04</div>
 
       <div class="class-card">
         <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
@@ -143,10 +147,39 @@
           </ul>
         </div>
       </div>
+
+      <div class="class-card">
+        <div class="class-header" onclick="this.parentElement.classList.toggle('open')">
+          <span class="class-num">04</span>
+          <div class="class-info">
+            <div class="class-title">The Path of a Request</div>
+            <div class="class-summary">
+              What actually happens between hitting Enter on a URL and a packet arriving at a server: DNS resolution,
+              TTL-based cache invalidation, and the edge pipeline (gateway → auth → rate limit → routing → LB → reverse
+              proxy → server). Lives in the Distribution theme.
+            </div>
+          </div>
+          <span class="class-toggle">+</span>
+        </div>
+        <div class="class-topics">
+          <ul class="topic-list">
+            <li class="topic-item">
+              <a class="topic-link" href="distribution/dns-resolution.html"><span class="topic-status done"></span>DNS Resolution</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="distribution/dns-ttl-and-change.html"><span class="topic-status done"></span>DNS TTL &amp; Cutovers</a>
+            </li>
+            <li class="topic-item">
+              <a class="topic-link" href="distribution/api-gateway-pipeline.html"><span class="topic-status done"></span>The API Gateway Pipeline</a>
+            </li>
+          </ul>
+        </div>
+      </div>
     </section>
 
     <footer class="site-footer">
       TJIP Phase 02 — More classes added as the course progresses.
     </footer>
+    <script src="search.js" defer></script>
   </body>
 </html>

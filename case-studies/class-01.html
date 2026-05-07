@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="../styles.css" />
   </head>
-  <body>
+  <body data-base="../">
     <nav class="site-nav">
       <div class="site-nav-inner">
         <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
@@ -21,6 +21,10 @@
           <a href="../classes.html">Classes</a>
           <a href="index.html" class="active">Case Studies</a>
           <a href="../glossary.html">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
         </div>
       </div>
     </nav>
@@ -742,5 +746,6 @@
     <footer class="site-footer">
       Class 01 · Hardware &amp; Execution. <a href="index.html" style="color: var(--accent)">Back to case-studies hub →</a> · Drawing from Stroustrup, the SO sorted-array thread, the C10K paper, Pike's "Concurrency Is Not Parallelism," Gunicorn / Node.js / DPDK production patterns
     </footer>
+    <script src="../search.js" defer></script>
   </body>
 </html>

@@ -7,6 +7,8 @@ The vocabulary of fast systems: latency, throughput, the trade-off between them,
 - [latency.html](../latency.html) — per-request stopwatch; the 1,000× hierarchy (Jeff Dean's list, refreshed to 2026 hardware); access latency vs bandwidth; budget-driven tech choices.
 - [throughput.html](../throughput.html) — system-wide rate; RPS/QPS/TPS/goodput; the bottleneck rule; levers (parallelism, horizontal scale, batching, async, load shedding).
 - [latency-throughput.html](../latency-throughput.html) — independent-but-coupled axes; the knee of the curve; Little's Law (`L = λ × W`); averages vs p95/p99; tail-at-scale.
+- [back-of-envelope.html](../back-of-envelope.html) — paper-only sizing; powers-of-2 / 10⁵-seconds-per-day cheat sheet; four-step funnel (assumptions → daily → per-second → peak); two worked examples (Twitter timeline for QPS/storage/cache; YouTube for video bytes + 80/20 edge-cache); common traps (peak vs avg, replication, bits vs bytes, fan-out).
+- [resilience-patterns.html](../resilience-patterns.html) — failure-mode patterns: transient failures, retry storm, retry capping + budgets, exponential backoff with jitter (equal/full/decorrelated), Retry-After, circuit breaker (closed/open/half-open), bulkhead, gateway throttling (token/leaky bucket, concurrency limit), cache stampede (single-flight, probabilistic refresh, stale-while-revalidate, TTL jitter), thundering herd, desync periodic events, ZooKeeper-style chained-watch leader election, graceful degradation, batching as failure isolation.
 
 ## Key ideas to keep in the back of your head
 
@@ -17,6 +19,8 @@ The vocabulary of fast systems: latency, throughput, the trade-off between them,
 - Little's Law holds unconditionally for any stable system: concurrency = throughput × latency. Three numbers; fix any two, the third is forced.
 - Averages hide tails. p99 is what power users experience; in an N-way fan-out, the page's latency is dominated by the worst tail of N.
 - The knee of the latency–throughput curve is where a small load increase tips the system into overload.
+- Back-of-the-envelope estimation: ~10⁵ seconds/day, 2¹⁰ ≈ 10³, peak ≈ 3× avg, replication ×3, bits ÷ 8 = bytes. Goal is ~10× accuracy, not 10%.
+- Resilience is what keeps the happy-path numbers honest: jittered retries with caps, circuit breakers, bulkheads, gateway throttling, single-flight caches, graceful degradation. Idempotency is the precondition for all of it.
 
 ## Case studies — `class-03-case-studies.html`
 

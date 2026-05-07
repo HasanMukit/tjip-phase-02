@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The API Gateway Pipeline — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Distribution</a></div>
+        <h1>The API gateway <em>pipeline</em></h1>
+        <p class="deck">What sits between a client and a server in any modern system: gateway → auth → rate limit → routing → load balancer → reverse proxy → server. Each step explained, and why the order matters.</p>
+        <div class="meta">
+          <span class="class-pill">Class 04</span>
+          <span>Theme · Distribution</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#why">Why a pipeline at all</a></li>
+          <li><a href="#shape">The shape of the pipeline</a></li>
+          <li><a href="#gateway">API gateway — the front door</a></li>
+          <li><a href="#gates">Auth and rate limit — the gates</a></li>
+          <li><a href="#dispatch">Routing and load balancing — the dispatchers</a></li>
+          <li><a href="#proxy">Reverse proxy — TLS, compression, cache</a></li>
+          <li><a href="#forward-proxy">Forward proxy — the mirror image</a></li>
+          <li><a href="#interconnections">How the pieces interconnect</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">DNS gave the client an IP. The packet leaves the laptop and arrives at — what, exactly? Almost never the application server itself. In any modern system the request first threads through a pipeline of edge components, each of which does one cross-cutting job: <em>authenticate, throttle, route, balance, decrypt, compress, cache, then finally hand the request to a server</em>. The server is the last thing the request touches, not the first.</p>
+
+      <p>This page walks the pipeline left-to-right, names each role, explains how the roles connect, and ends with the architectural punch line: the whole pipeline exists so the server can be small.</p>
+
+      <h2 id="why"><span class="num">01</span>Why a pipeline at all</h2>
+
+      <p>A naive design puts the server at the public IP and lets the client talk to it directly. That works for a class project. It breaks for anything real, because every server then has to:</p>
+
+      <ul>
+        <li>Hold its own TLS certificate and renew it.</li>
+        <li>Verify auth tokens on every request.</li>
+        <li>Count requests per user to enforce rate limits.</li>
+        <li>Decide whether the request belongs to it or to a different microservice.</li>
+        <li>Compress responses, cache hot results, log everything for observability.</li>
+        <li>And — separately — handle the actual business logic.</li>
+      </ul>
+
+      <p>The pipeline takes those cross-cutting concerns off the server's plate and centralises them at the edge. Each stage does one thing; the server, at the end, can be a plain HTTP service that just answers questions.</p>
+
+      <h2 id="shape"><span class="num">02</span>The shape of the pipeline</h2>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The full pipeline</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <!-- client -->
+          <circle cx="60" cy="160" r="28" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="60" y="165" text-anchor="middle" class="svg-text-bold">client</text>
+
+          <!-- pipeline boxes -->
+          <g>
+            <rect x="110" y="60" width="450" height="200" rx="6" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text x="335" y="50" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">API gateway (often one process)</text>
+          </g>
+
+          <!-- auth -->
+          <rect x="125" y="80" width="90" height="48" rx="4" fill="var(--paper-warm)" stroke="var(--s1)"/>
+          <text x="170" y="100" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">auth</text>
+          <text x="170" y="118" text-anchor="middle" class="svg-text-small" fill="var(--muted)">who?</text>
+
+          <!-- rate limit -->
+          <rect x="225" y="80" width="100" height="48" rx="4" fill="var(--paper-warm)" stroke="var(--s2)"/>
+          <text x="275" y="100" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">rate limit</text>
+          <text x="275" y="118" text-anchor="middle" class="svg-text-small" fill="var(--muted)">how many?</text>
+
+          <!-- routing -->
+          <rect x="335" y="80" width="90" height="48" rx="4" fill="var(--paper-warm)" stroke="var(--s3)"/>
+          <text x="380" y="100" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">routing</text>
+          <text x="380" y="118" text-anchor="middle" class="svg-text-small" fill="var(--muted)">which service?</text>
+
+          <!-- arrows between top row -->
+          <line x1="215" y1="104" x2="225" y2="104" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="222,101 227,104 222,107" fill="var(--muted)"/>
+          <line x1="325" y1="104" x2="335" y2="104" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="332,101 337,104 332,107" fill="var(--muted)"/>
+
+          <!-- bend down -->
+          <path d="M 425 104 L 470 104 L 470 175 L 425 175" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="428,172 421,175 428,178" fill="var(--muted)"/>
+
+          <!-- load balancer -->
+          <rect x="335" y="160" width="90" height="48" rx="4" fill="var(--paper-warm)" stroke="var(--s4)"/>
+          <text x="380" y="180" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">LB</text>
+          <text x="380" y="198" text-anchor="middle" class="svg-text-small" fill="var(--muted)">which instance?</text>
+
+          <!-- reverse proxy -->
+          <rect x="225" y="160" width="100" height="48" rx="4" fill="var(--paper-warm)" stroke="var(--accent)"/>
+          <text x="275" y="180" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">reverse proxy</text>
+          <text x="275" y="198" text-anchor="middle" class="svg-text-small" fill="var(--muted)">TLS · gzip · cache</text>
+
+          <line x1="335" y1="184" x2="325" y2="184" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="328,181 323,184 328,187" fill="var(--muted)"/>
+
+          <!-- bend left -->
+          <path d="M 225 184 L 180 184 L 180 234 L 215 234" fill="none" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="212,231 219,234 212,237" fill="var(--muted)"/>
+
+          <!-- server pool -->
+          <g>
+            <rect x="220" y="220" width="60" height="30" rx="3" fill="var(--paper-warm)" stroke="var(--rule)"/>
+            <rect x="290" y="220" width="60" height="30" rx="3" fill="var(--paper-warm)" stroke="var(--rule)"/>
+            <rect x="360" y="220" width="60" height="30" rx="3" fill="var(--paper-warm)" stroke="var(--rule)"/>
+            <text x="250" y="240" text-anchor="middle" class="svg-text-bold">server</text>
+            <text x="320" y="240" text-anchor="middle" class="svg-text-bold">server</text>
+            <text x="390" y="240" text-anchor="middle" class="svg-text-bold">server</text>
+          </g>
+          <text x="320" y="275" text-anchor="middle" class="svg-text-small" fill="var(--muted)">N instances of one service</text>
+
+          <!-- client → gateway arrow -->
+          <line x1="92" y1="160" x2="120" y2="100" stroke="var(--accent)" stroke-width="1.5"/>
+          <polygon points="117,103 122,98 124,107" fill="var(--accent)"/>
+        </svg>
+        <p class="figure-caption">Top row: gates and dispatch. Bottom row: balancing, edge functions, then the server pool. The dashed box marks how much of the pipeline often runs in a single gateway process — the boundaries are conceptual, not physical.</p>
+      </div>
+
+      <p>Read the diagram top to bottom: a request enters the gateway, gets through auth and rate limit (the gates), gets routed to the right service, gets balanced across that service's instances, decrypted and possibly served from the proxy's cache, and only then arrives at a server.</p>
+
+      <p>These are <em>roles</em>, not necessarily separate boxes. In practice an API gateway is often one process that internally does auth + rate limit + routing, and the load balancer + reverse proxy are usually the same NGINX/Envoy/HAProxy instance. But conceptually each role is distinct, and large systems split them across separate tiers.</p>
+
+      <h2 id="gateway"><span class="num">03</span>API gateway — the front door</h2>
+
+      <p>An <a class="glink" href="../glossary.html#api-gateway">API gateway</a> is one public endpoint that fronts many backend services. It owns the cross-cutting concerns no individual service should re-implement: authentication, rate limiting, request shaping, observability, API versioning. Backends sit behind it as plain services.</p>
+
+      <p>The mental model: a hotel front desk. Every guest passes through it; the back-of-house rooms don't each need their own check-in. Common implementations: Kong, AWS API Gateway, Apigee, Envoy, Tyk, or NGINX with custom modules.</p>
+
+      <h2 id="gates"><span class="num">04</span>Auth and rate limit — the gates</h2>
+
+      <h3>Authentication and authorization</h3>
+
+      <ul>
+        <li><strong>Authentication = "who are you?"</strong> Verifies identity. Mechanisms: API key, JWT, OAuth2 access token, mTLS client cert, session cookie.</li>
+        <li><strong>Authorization = "what are you allowed to do?"</strong> Checks the authenticated identity against the requested action. Roles, scopes, ACLs, policy engines (OPA).</li>
+      </ul>
+
+      <p>Token validation is usually stateless — verify a JWT signature locally, no database round-trip — which is part of why it's cheap to put at the edge. Anything that fails auth short-circuits here, before the rest of the pipeline costs anything.</p>
+
+      <h3>Rate limiting</h3>
+
+      <p><a class="glink" href="../glossary.html#rate-limiting">Rate limiting</a> caps how many requests a given identity (user, API key, IP) can issue per window. Two reasons: <strong>fairness</strong> (one noisy tenant can't starve everyone else) and <strong>defense</strong> (cap the cost of abuse, scraping, DoS).</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#token-bucket">Token bucket</a></h4>
+          <p>A bucket holds up to N tokens, refilling at rate R per second. Each request consumes one token; an empty bucket means rejection. Allows bursts up to N, sustains R over time.</p>
+        </div>
+        <div class="card">
+          <h4><a class="glink" href="../glossary.html#leaky-bucket">Leaky bucket</a></h4>
+          <p>Requests enter a fixed-size queue and drain out at a constant rate. Output is perfectly smooth no matter how spiky the input. Use when you need to protect a downstream that hates bursts.</p>
+        </div>
+      </div>
+
+      <p>Other algorithms: fixed-window (simple but has edge-of-window double-burst), sliding-window log (precise but expensive). Whatever the algorithm, the limit lives at the gateway because the gateway sees every request — putting it deeper means the limit only kicks in <em>after</em> you've already paid for routing.</p>
+
+      <div class="callout">
+        <div class="callout-label">Order matters</div>
+        <strong>Auth first, rate limit second.</strong> Auth so that anonymous abusers can't even count against per-user limits; rate limit so that authenticated abusers are still bounded. Reversing the order means an attacker can trigger your rate-limit storage on every request without ever having to log in.
+      </div>
+
+      <h2 id="dispatch"><span class="num">05</span>Routing and load balancing — the dispatchers</h2>
+
+      <p>These look similar from a distance and are often the same physical box, but they answer different questions.</p>
+
+      <h3>Routing — <em>which service?</em></h3>
+
+      <p>Routing picks the right backend service based on the request: path (<code>/api/users/*</code> → users service), host (<code>payments.example.com</code> → payments service), header, method, even body shape. This is where a monolithic-looking external API decomposes into microservices internally.</p>
+
+      <p>Routing decisions can also be weighted — useful for canary deploys ("send 1% of traffic to v2").</p>
+
+      <h3>Load balancing — <em>which instance?</em></h3>
+
+      <p>The <a class="glink" href="../glossary.html#load-balancer">load balancer</a> spreads requests across the N instances of a single service chosen by routing. It comes in two main flavours.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — L4 vs L7 load balancing</div>
+        <svg viewBox="0 0 640 260" xmlns="http://www.w3.org/2000/svg">
+          <!-- L4 column -->
+          <text x="160" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">L4 — transport layer</text>
+
+          <rect x="40" y="50" width="240" height="160" rx="4" fill="var(--paper-warm)" stroke="var(--s2)"/>
+          <text x="160" y="75" text-anchor="middle" class="svg-text-bold">sees TCP packets</text>
+          <text x="60" y="105" class="svg-text-small">• balances by 5-tuple</text>
+          <text x="60" y="125" class="svg-text-small">• protocol-agnostic</text>
+          <text x="60" y="145" class="svg-text-small">• fast, low CPU</text>
+          <text x="60" y="165" class="svg-text-small">• blind to HTTP details</text>
+          <text x="60" y="195" class="svg-text-small" fill="var(--muted)">e.g. AWS NLB, IPVS</text>
+
+          <!-- L7 column -->
+          <text x="480" y="30" text-anchor="middle" class="svg-text-bold" fill="var(--s4)">L7 — application layer</text>
+
+          <rect x="360" y="50" width="240" height="160" rx="4" fill="var(--paper-warm)" stroke="var(--s4)"/>
+          <text x="480" y="75" text-anchor="middle" class="svg-text-bold">parses HTTP requests</text>
+          <text x="380" y="105" class="svg-text-small">• balances by URL, header, cookie</text>
+          <text x="380" y="125" class="svg-text-small">• content-aware routing</text>
+          <text x="380" y="145" class="svg-text-small">• sticky sessions possible</text>
+          <text x="380" y="165" class="svg-text-small">• slower (parses every req)</text>
+          <text x="380" y="195" class="svg-text-small" fill="var(--muted)">e.g. ALB, NGINX, Envoy, HAProxy</text>
+
+          <text x="320" y="245" text-anchor="middle" class="svg-text-small" fill="var(--muted)">Use L4 when you don't need HTTP smarts; L7 when you do.</text>
+        </svg>
+        <p class="figure-caption">L4 lives below the HTTP layer and is correspondingly faster and simpler. L7 understands HTTP, which is what makes URL-based routing, sticky sessions, and content-aware logic possible.</p>
+      </div>
+
+      <p>Algorithms within the LB: <strong>round-robin</strong> (rotate), <strong>least connections</strong> (pick the instance with the fewest active conns — adapts to real load), <strong>least response time</strong>, <strong>consistent hashing</strong> (sticky placement; ties back to the consistent-hashing page), <strong>weighted</strong> (give bigger boxes more traffic).</p>
+
+      <p>Health checks remove dead instances from the pool — without this the LB happily routes into a black hole.</p>
+
+      <h2 id="proxy"><span class="num">06</span>Reverse proxy — TLS, compression, cache</h2>
+
+      <p>A <a class="glink" href="../glossary.html#reverse-proxy">reverse proxy</a> sits in front of one or more backend servers and pretends to be the server to the client. The same physical box is often also the load balancer, but the <em>role</em> is different: load balancing is about spreading load; proxying is about wrapping the backend with edge functionality.</p>
+
+      <div class="callout">
+        <div class="callout-label">Wait — isn't LB before RP? Do I need one RP per server?</div>
+        Common confusion. In the diagram, LB and RP are separate roles; in deployment, <strong>they're usually the same process</strong> (NGINX, Envoy, HAProxy all play both). One box receives the request, its LB function picks a backend, its proxy function wraps and forwards. So <em>one RP fans out to N servers</em> — no per-server proxy explosion. Multi-layer setups exist (a cloud L4 LB in front of an NGINX fleet; service-mesh sidecars next to each pod), but every layer still funnels-then-fans-out. The "LB before RP" arrow in the diagram is logical order, not physical sequence.
+      </div>
+
+      <p>Three jobs always show up at the proxy layer:</p>
+
+      <h3>TLS termination</h3>
+
+      <p>The proxy holds the certificate and private key. It decrypts incoming HTTPS once, then talks plain HTTP (or re-encrypted HTTP) to the backend.</p>
+
+      <ul>
+        <li><strong>Certificate management in one place</strong> — issue, renew, rotate at the edge instead of on every backend.</li>
+        <li><strong>Backends don't pay TLS CPU</strong> — handshakes are expensive; do them once.</li>
+        <li><strong>Routing by HTTP content becomes possible</strong> — you can't inspect or route by URL while the bytes are still encrypted.</li>
+      </ul>
+
+      <h3>Compression</h3>
+
+      <p>Gzip / Brotli responses on the way out. Done at the edge so backends don't each implement it; saves bandwidth and tail latency for clients on slow links.</p>
+
+      <h3>Caching</h3>
+
+      <p>Repeat responses (especially <code>GET</code>s with cacheable headers) get served from the proxy without ever touching the backend. This is the same idea as DNS caching, one layer up: TTL-based pull, purge APIs for explicit invalidation, <a class="glink" href="../glossary.html#stale-while-revalidate">stale-while-revalidate</a> to hide refresh latency. <a class="glink" href="../glossary.html#cdn">CDNs</a> like Cloudflare, Fastly, and Akamai are reverse proxies turned global.</p>
+
+      <p>Other things the proxy commonly handles: HTTP/2 → HTTP/1 translation, request/response header rewriting, WebSocket upgrade handling, basic WAF rules.</p>
+
+      <h2 id="forward-proxy"><span class="num">07</span>Forward proxy — the mirror image</h2>
+
+      <p>The reverse proxy is one half of a symmetric pair. Its mirror is the <a class="glink" href="../glossary.html#forward-proxy">forward proxy</a>, which sits in front of <em>clients</em> rather than servers. Same idea — a middleman that wraps and translates traffic — but on the opposite side of the wire.</p>
+
+      <p>Where a reverse proxy <strong>stands in for the server</strong> (the client thinks it's talking to the server), a forward proxy <strong>stands in for the client</strong> (the server thinks it's talking to the proxy). What changes between the two is not what the box does — it's whose side it represents.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 03 — Forward vs reverse proxy</div>
+        <svg viewBox="0 0 640 280" xmlns="http://www.w3.org/2000/svg">
+          <!-- Forward proxy row -->
+          <text x="20" y="36" class="svg-text-bold" fill="var(--s1)">forward proxy — hides the client</text>
+
+          <circle cx="60" cy="80" r="22" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="60" y="84" text-anchor="middle" class="svg-text-bold">client</text>
+
+          <rect x="120" y="58" width="120" height="44" rx="4" fill="var(--paper-warm)" stroke="var(--s1)" stroke-width="2"/>
+          <text x="180" y="84" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">forward proxy</text>
+
+          <line x1="84" y1="80" x2="118" y2="80" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="115,77 120,80 115,83" fill="var(--muted)"/>
+
+          <line x1="240" y1="80" x2="280" y2="80" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="277,77 282,80 277,83" fill="var(--muted)"/>
+
+          <text x="320" y="74" text-anchor="middle" class="svg-text-small" fill="var(--muted)">internet</text>
+          <line x1="285" y1="80" x2="355" y2="80" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3,3"/>
+
+          <line x1="358" y1="80" x2="395" y2="80" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="392,77 397,80 392,83" fill="var(--muted)"/>
+
+          <rect x="395" y="58" width="80" height="44" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="435" y="84" text-anchor="middle" class="svg-text-bold">server</text>
+
+          <text x="555" y="78" class="svg-text-small" fill="var(--muted)">sees</text>
+          <text x="555" y="92" class="svg-text-small" fill="var(--s1)">proxy IP</text>
+
+          <!-- divider -->
+          <line x1="20" y1="135" x2="620" y2="135" stroke="var(--rule)" stroke-dasharray="2,4"/>
+
+          <!-- Reverse proxy row -->
+          <text x="20" y="170" class="svg-text-bold" fill="var(--accent)">reverse proxy — hides the server</text>
+
+          <circle cx="60" cy="215" r="22" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="60" y="219" text-anchor="middle" class="svg-text-bold">client</text>
+
+          <line x1="84" y1="215" x2="120" y2="215" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="117,212 122,215 117,218" fill="var(--muted)"/>
+
+          <text x="180" y="209" text-anchor="middle" class="svg-text-small" fill="var(--muted)">internet</text>
+          <line x1="125" y1="215" x2="240" y2="215" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3,3"/>
+
+          <line x1="244" y1="215" x2="280" y2="215" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="277,212 282,215 277,218" fill="var(--muted)"/>
+
+          <rect x="282" y="193" width="120" height="44" rx="4" fill="var(--paper-warm)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="342" y="219" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">reverse proxy</text>
+
+          <line x1="402" y1="215" x2="435" y2="215" stroke="var(--muted)" stroke-width="1.2"/>
+          <polygon points="432,212 437,215 432,218" fill="var(--muted)"/>
+
+          <rect x="438" y="193" width="80" height="44" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="478" y="219" text-anchor="middle" class="svg-text-bold">server</text>
+
+          <text x="20" y="240" class="svg-text-small" fill="var(--muted)">thinks it</text>
+          <text x="20" y="254" class="svg-text-small" fill="var(--accent)">talks to proxy</text>
+
+          <text x="555" y="263" class="svg-text-small" fill="var(--muted)">N instances</text>
+          <text x="555" y="277" class="svg-text-small" fill="var(--muted)">behind</text>
+        </svg>
+        <p class="figure-caption">The proxy is a middleman in both cases — what differs is which end it's pretending to be. A forward proxy speaks for the client; a reverse proxy speaks for the server.</p>
+      </div>
+
+      <p>Common reasons to run a forward proxy:</p>
+
+      <ul>
+        <li><strong>Corporate egress filtering.</strong> Every laptop on the network talks to the internet through a forward proxy that blocks known-bad domains, scans for malware, and enforces an acceptable-use policy. The classic on-premises web proxy (Squid, Blue Coat, Zscaler).</li>
+        <li><strong>Egress caching.</strong> When 500 employees all download the same Ubuntu update, the proxy fetches it once and serves the rest from cache. Saves WAN bandwidth on networks where the bottleneck is the link, not the destination.</li>
+        <li><strong>Audit and DLP.</strong> Logging every outbound request — and inspecting payloads for data-loss prevention — is much easier when one box sees everyone's traffic.</li>
+        <li><strong>Anonymity / IP masking.</strong> The destination server sees the proxy's IP, not the client's. This is the entire premise of Tor, residential proxies, and VPNs in their proxy mode.</li>
+        <li><strong>Geo-routing or unblocking.</strong> Routing through a proxy in another jurisdiction to reach content gated by IP geolocation.</li>
+      </ul>
+
+      <p>The mnemonic that makes the names finally click:</p>
+
+      <p class="pullquote">Forward proxy hides the client. Reverse proxy hides the server.</p>
+
+      <p>In modern systems both kinds often coexist on the same request. Your laptop's traffic might leave a corporate network through a forward proxy, cross the public internet, and land at a destination's reverse proxy before reaching the actual server. The same software (NGINX, Envoy, HAProxy, Squid) can play either role — what makes it "forward" or "reverse" is whose side it stands on, not the binary itself.</p>
+
+      <h2 id="interconnections"><span class="num">08</span>How the pieces interconnect</h2>
+
+      <p>Worth pointing out the connections that aren't obvious from the picture:</p>
+
+      <ul>
+        <li><strong>Auth and rate limit are both gates.</strong> They cheap-fail before expensive work. Order: auth first, rate limit second (see callout above).</li>
+        <li><strong>Routing and load balancing answer different questions.</strong> Routing: <em>which service?</em> Load balancing: <em>which instance of that service?</em> In tools like Envoy these are the same config language but semantically separate stages.</li>
+        <li><strong>Reverse proxy and load balancer often live in the same process.</strong> NGINX, Envoy, HAProxy each play both roles. The terms describe what the box is doing for a given request, not where it runs.</li>
+        <li><strong>Caching at the reverse proxy connects back to the resilience patterns.</strong> Single-flight, stale-while-revalidate, TTL jitter, and stampede protection all belong here — the proxy cache is exactly where Class 03's cache patterns get applied in real systems.</li>
+        <li><strong>DNS sits <em>outside</em> the pipeline entirely.</strong> It ran before any of this — the pipeline starts only once the client has an IP. But the same TTL-and-pull idea recurs at the proxy cache layer, which is why we taught DNS first.</li>
+      </ul>
+
+      <p class="pullquote">The whole pipeline exists so the server can be small.</p>
+
+      <p>By the time the request reaches the application, it's been authenticated, rate-checked, routed to the right service, sent to a healthy instance, decrypted, possibly compressed-on-the-way-out, and possibly served from cache before the server was even woken up. The server therefore doesn't need to know about TLS certs, JWT signing keys, gzip, or rate-limit storage. It just answers the question.</p>
+
+      <h2 id="takeaway"><span class="num">09</span>The one-line takeaway</h2>
+
+      <p class="pullquote">A modern request doesn't reach the server first — it threads through a pipeline of edge components that take cross-cutting concerns off the server's plate, and the server is the last thing to touch the bytes.</p>
+
+      <p>Once you can name the seven stages and what each one does, every architecture diagram in the industry becomes legible. "We put auth in front of rate limit," "we terminate TLS at the LB," "we cache at the CDN" — these are all moves on the same board. The pipeline is the board.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#api-gateway">API gateway</a><a href="../glossary.html#rate-limiting">rate limiting</a><a href="../glossary.html#token-bucket">token bucket</a><a href="../glossary.html#leaky-bucket">leaky bucket</a><a href="../glossary.html#load-balancer">load balancer</a><a href="../glossary.html#reverse-proxy">reverse proxy</a><a href="../glossary.html#forward-proxy">forward proxy</a><a href="../glossary.html#tls-termination">TLS termination</a><a href="../glossary.html#stale-while-revalidate">stale-while-revalidate</a><a href="../glossary.html#cdn">CDN</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="dns-resolution.html">
+              <span class="related-arrow">→</span>
+              <span>DNS Resolution</span>
+              <span class="related-summary">— what runs before the pipeline starts.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../reliability/resilience-patterns.html">
+              <span class="related-arrow">→</span>
+              <span>Resilience Patterns</span>
+              <span class="related-summary">— retries, breakers, throttles. Most of them live at the gateway.</span>
+            </a>
+          </li>
+          <li>
+            <a href="consistent-hashing.html">
+              <span class="related-arrow">→</span>
+              <span>Consistent Hashing</span>
+              <span class="related-summary">— how an L7 load balancer can stick the same key to the same instance.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 04 · Distribution. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>

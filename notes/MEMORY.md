@@ -13,8 +13,10 @@ Persistent, repo-local context so future conversations can pick up cold without 
 - [PLAN.md](PLAN.md) — roadmap for all 24 classes, status, how to extend, durable design rules
 - [style-guide.md](style-guide.md) — HTML/CSS conventions extracted from the existing class pages
 - [case-study-template.md](case-study-template.md) — canonical skeleton for class-NN-case-studies.html (four-block + reveal structure)
+- [class-01.md](class-01.md) — Class 01 summary, topic pages, case study index
 - [class-02.md](class-02.md) — Class 02 summary, topic pages, case study index
 - [class-03.md](class-03.md) — Class 03 summary, topic pages, case study index
+- [class-04.md](class-04.md) — Class 04 source notes (DNS, cache invalidation/TTL, API gateway pipeline) — promoted to HTML in `distribution/`
 
 ## How to use
 

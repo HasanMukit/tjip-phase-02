@@ -52,7 +52,7 @@ Every topic lives in exactly one theme. A topic's class assignment is metadata (
      </div>
    </div>
    ```
-   Separators between terms are inserted by CSS (`a + a::before`). No descriptions in markup.
+   Separators between terms are inserted by CSS (`a:not(:last-child)::after`) on a flex-wrap container. No descriptions in markup.
 7. **Related topics** block — three links is the standard:
    ```html
    <div class="related-topics">

@@ -4,14 +4,15 @@ A single tracker for the whole course. Marks what's done, what's stubbed, and th
 
 ## Status at a glance
 
-| #     | Title                            | Topic pages                                                  | Case studies                     | Status              |
-| ----- | -------------------------------- | ------------------------------------------------------------ | -------------------------------- | ------------------- |
-| 01    | *(unassigned)*                   | —                                                            | —                                | stub in index.html  |
-| 02    | Distributed Systems Fundamentals | `consistent-hashing.html`, `cap-theorem.html`                | `class-02-case-studies.html` (7) | **done**            |
-| 03    | Performance Fundamentals         | `latency.html`, `throughput.html`, `latency-throughput.html` | `class-03-case-studies.html` (8) | **done**            |
-| 04–24 | *(unassigned)*                   | —                                                            | —                                | stubs in index.html |
+| #     | Title                            | Topic pages                                                                  | Case studies                     | Status              |
+| ----- | -------------------------------- | ---------------------------------------------------------------------------- | -------------------------------- | ------------------- |
+| 01    | Hardware & the Execution Model   | `hardware-pressure.html`, `memory-hierarchy.html`, `cache-locality.html`, `process-vs-thread.html`, `concurrency-vs-parallelism.html`, `event-loop.html`, `context-switching.html`, `core-pinning.html` | `class-01-case-studies.html` (12) | **done**            |
+| 02    | Distributed Systems Fundamentals | `consistent-hashing.html`, `cap-theorem.html`                                | `class-02-case-studies.html` (7) | **done**            |
+| 03    | Performance Fundamentals         | `latency.html`, `throughput.html`, `latency-throughput.html`                 | `class-03-case-studies.html` (8) | **done**            |
+| 04    | The Path of a Request            | `distribution/dns-resolution.html`, `distribution/dns-ttl-and-change.html`, `distribution/api-gateway-pipeline.html` | *(none — by user request)* | **done**            |
+| 05–24 | *(unassigned)*                   | —                                                                            | —                                | stubs in index.html |
 
-Classes 01 and 04–24 exist in `index.html` as "Coming Soon" cards. 22 classes still need content.
+Classes 04–24 exist in `index.html` as "Coming Soon" cards. 21 classes still need content.
 
 ## Standard structure for every class
 
