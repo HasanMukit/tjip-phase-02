@@ -387,7 +387,22 @@ Run all three after every milestone. They take seconds and catch most regression
 
 ---
 
-## 8. User preferences (collected from past sessions)
+## 8. Local preview
+
+The site is plain static HTML — opening any page directly in a browser works for reading. **One exception:** the nav search box loads `search-index.json` via `fetch()`, which browsers block on `file://` URLs. To preview search, serve the site over HTTP.
+
+One-shot:
+
+```bash
+./scripts/preview.sh        # builds the index, serves on http://localhost:8000/
+PORT=8765 ./scripts/preview.sh   # override port if 8000 is taken
+```
+
+`search-index.json` is gitignored and rebuilt by CI (`.github/workflows/deploy.yml`) on every push to `main`. Don't commit it locally — it produces full-file diffs on every content change and creates merge conflicts on parallel PRs. The CI build is the authoritative source.
+
+---
+
+## 9. User preferences (collected from past sessions)
 
 These shaped the current design. Honour them unless explicitly overridden.
 
@@ -405,7 +420,7 @@ These shaped the current design. Honour them unless explicitly overridden.
 
 ---
 
-## 9. What goes where (decision matrix)
+## 10. What goes where (decision matrix)
 
 | Question | Answer |
 |---|---|
@@ -421,6 +436,6 @@ These shaped the current design. Honour them unless explicitly overridden.
 
 ---
 
-## 10. History
+## 11. History
 
 The original v1 site (a flat list of `*.html` files at the repo root) was retired and replaced by this theme-organised v2 site, which now lives at the repo root. The `topics/` subfolder no longer exists — all HTML, the stylesheet, and theme folders sit directly at the root.
