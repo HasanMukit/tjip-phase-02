@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pagination — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+          <a href="../resources.html">Resources</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Interfaces</a></div>
+        <h1><em>Pagination</em></h1>
+        <p class="deck">Offset/limit's two failure modes — the deep-page perf cliff and inconsistency under live writes — and how cursor pagination fixes both with an indexed seek and a stable handle on "where I left off".</p>
+        <div class="meta">
+          <span class="class-pill">Class 05</span>
+          <span>Theme · Interfaces</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#why">Why paginate at all</a></li>
+          <li><a href="#offset">Offset/limit pagination</a></li>
+          <li><a href="#problems">The two problems offset doesn't solve</a></li>
+          <li><a href="#cursor">Cursor pagination</a></li>
+          <li><a href="#pick">When to pick which</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">A list endpoint is a small lie. <code>GET /posts</code> looks like one operation, but the result set might be ten rows or ten million. Returning everything in one response burns memory on both sides, blows past the bandwidth budget, and pushes time-to-first-byte into the seconds. Pagination is the contract that turns one impossible request into a sequence of bounded ones — and the choice of contract decides whether deep pages are cheap or catastrophic.</p>
+
+      <p>This page walks the two main pagination styles in the order most teams meet them: offset/limit (the obvious choice that breaks at scale), then cursor (the fix). The two failure modes of offset — the performance cliff and inconsistency under writes — share a root cause that cursor pagination directly addresses.</p>
+
+      <h2 id="why"><span class="num">01</span>Why paginate at all</h2>
+
+      <p>Three forces push back against "just return everything":</p>
+
+      <ul>
+        <li><strong>Bandwidth.</strong> A million 1 KB rows is a 1 GB response. Mobile clients won't survive it; even on a fast desktop the browser will OOM.</li>
+        <li><strong>Memory.</strong> The server has to materialise the result set somewhere. A list of a million ORM objects is enough to crash a process even if the network could handle the bytes.</li>
+        <li><strong>Time-to-first-byte.</strong> The user staring at a spinner is paying the latency for the <em>last</em> row, not the first. Pagination lets the first 20 rows flush early and leaves the rest for "load more".</li>
+      </ul>
+
+      <p>So the API takes the list a slice at a time. The interesting question is <em>how</em> the client tells the server which slice to return next.</p>
+
+      <h2 id="offset"><span class="num">02</span>Offset/limit pagination</h2>
+
+      <p>The classic shape, and the one most APIs reach for first because it maps naturally onto SQL:</p>
+
+      <div class="codeblock"><code>GET /posts?limit=20&amp;offset=40</code></div>
+
+      <p>Server runs:</p>
+
+      <div class="codeblock"><code>SELECT * FROM posts ORDER BY created_at DESC LIMIT 20 OFFSET 40;</code></div>
+
+      <p>It feels natural — "give me page 3 of 20-per-page" maps to <code>offset=40, limit=20</code>. UIs love it because rendering "Page 3 of 50" is straightforward. Admin dashboards live on it. For small datasets it works fine.</p>
+
+      <p>It has two serious problems. The first one bites at scale. The second one bites under any live-write traffic, regardless of size.</p>
+
+      <h2 id="problems"><span class="num">03</span>The two problems offset doesn't solve</h2>
+
+      <h3>Problem 1 — performance falls off a cliff at large offsets</h3>
+
+      <p><code>OFFSET 1000000</code> does <em>not</em> mean "skip a million rows cheaply". It means the database has to scan and discard the first million rows before it can return yours. The cost is <code>O(offset)</code>, not <code>O(limit)</code>. A "load page 50,000" request costs the same as scanning 50,000 pages of data — even though the user only sees 20 rows.</p>
+
+      <p>Indexes help the <em>ordering</em> step (the database walks an index instead of sorting on the fly) but they don't avoid the discard-the-first-million step. The query plan still has to step over every offset row before it starts emitting yours.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 01 — The offset cliff: cost grows linearly with depth</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <!-- Axes -->
+          <line x1="60" y1="270" x2="600" y2="270" stroke="var(--ink)" stroke-width="1.5"/>
+          <line x1="60" y1="40" x2="60" y2="270" stroke="var(--ink)" stroke-width="1.5"/>
+
+          <text x="330" y="304" text-anchor="middle" class="svg-text-small" fill="var(--muted)">offset (page depth)</text>
+          <text x="20" y="156" text-anchor="middle" class="svg-text-small" fill="var(--muted)" transform="rotate(-90 20 156)">query latency</text>
+
+          <!-- x-axis ticks -->
+          <text x="60" y="288" text-anchor="middle" class="svg-text-small" fill="var(--muted)">0</text>
+          <text x="195" y="288" text-anchor="middle" class="svg-text-small" fill="var(--muted)">10k</text>
+          <text x="330" y="288" text-anchor="middle" class="svg-text-small" fill="var(--muted)">100k</text>
+          <text x="465" y="288" text-anchor="middle" class="svg-text-small" fill="var(--muted)">1M</text>
+          <text x="600" y="288" text-anchor="middle" class="svg-text-small" fill="var(--muted)">10M</text>
+
+          <!-- y-axis ticks -->
+          <text x="50" y="270" text-anchor="end" class="svg-text-small" fill="var(--muted)">1ms</text>
+          <text x="50" y="210" text-anchor="end" class="svg-text-small" fill="var(--muted)">100ms</text>
+          <text x="50" y="150" text-anchor="end" class="svg-text-small" fill="var(--muted)">1s</text>
+          <text x="50" y="90" text-anchor="end" class="svg-text-small" fill="var(--muted)">10s</text>
+
+          <!-- Offset/limit curve: linear with offset -->
+          <path d="M 60 268 L 195 240 L 330 175 L 465 105 L 600 50" fill="none" stroke="var(--s1)" stroke-width="2.5"/>
+          <text x="500" y="76" class="svg-text-bold" fill="var(--s1)">offset/limit</text>
+          <text x="500" y="92" class="svg-text-small" fill="var(--s1)">O(offset)</text>
+
+          <!-- Cursor curve: flat -->
+          <path d="M 60 264 L 600 258" fill="none" stroke="var(--s2)" stroke-width="2.5"/>
+          <text x="500" y="252" class="svg-text-bold" fill="var(--s2)">cursor</text>
+          <text x="500" y="268" class="svg-text-small" fill="var(--s2)">O(log N) per page</text>
+
+          <!-- Annotation -->
+          <line x1="465" y1="105" x2="465" y2="270" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3,2"/>
+          <circle cx="465" cy="105" r="4" fill="var(--accent)"/>
+          <text x="475" y="100" class="svg-text-small" fill="var(--accent)">page 50,000 ≈ 1 second</text>
+        </svg>
+        <p class="figure-caption">Offset cost grows linearly with depth — every "next page" pays for the rows it has to skip. Cursor cost is flat: an indexed seek to "where I left off" is the same operation whether you've paged once or a million times.</p>
+      </div>
+
+      <p>The cliff is invisible during local development (your test database has 100 rows; offset is free) and during early production (the offsets are still small). It shows up the day a user with a million-row inbox or a script crawling page-by-page hits the back of the table — and at that point the database is doing scan-and-discard for every request, which lights the CPU on fire.</p>
+
+      <h3>Problem 2 — inconsistent results when data changes</h3>
+
+      <p>Page 1 returns rows 1–20. The user reads them. Then someone inserts a new post at the top of the table. The user clicks "next page". Page 2 returns rows 21–40 — but the post that <em>was</em> at position 20 is now at position 21, so the user sees it twice. The reverse happens with deletions: rows skip out of view and the user never sees them at all.</p>
+
+      <div class="figure">
+        <div class="figure-label">Figure 02 — Why an insert duplicates a row across pages</div>
+        <svg viewBox="0 0 640 320" xmlns="http://www.w3.org/2000/svg">
+          <!-- T1 state -->
+          <text x="100" y="32" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">T1 — user fetches page 1</text>
+          <rect x="40" y="48" width="120" height="220" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="100" y="68" text-anchor="middle" class="svg-text-small" fill="var(--muted)">row 1 (newest)</text>
+          <line x1="50" y1="76" x2="150" y2="76" stroke="var(--rule)" stroke-width="0.5"/>
+          <text x="100" y="92" text-anchor="middle" class="svg-text-small">post #103</text>
+          <text x="100" y="108" text-anchor="middle" class="svg-text-small">post #102</text>
+          <text x="100" y="124" text-anchor="middle" class="svg-text-small">…</text>
+          <text x="100" y="148" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">post #84  ← row 20</text>
+          <line x1="50" y1="156" x2="150" y2="156" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="100" y="172" text-anchor="middle" class="svg-text-small">post #83</text>
+          <text x="100" y="188" text-anchor="middle" class="svg-text-small">…</text>
+          <text x="100" y="212" text-anchor="middle" class="svg-text-small">row 40</text>
+          <text x="100" y="232" text-anchor="middle" class="svg-text-small" fill="var(--muted)">row N</text>
+
+          <text x="100" y="290" text-anchor="middle" class="svg-text-small" fill="var(--ink)">page 1: rows 1–20</text>
+          <text x="100" y="306" text-anchor="middle" class="svg-text-small" fill="var(--muted)">→ #103 down to #84</text>
+
+          <!-- Arrow -->
+          <line x1="180" y1="160" x2="220" y2="160" stroke="var(--muted)" stroke-width="1.5"/>
+          <polygon points="216,157 222,160 216,163" fill="var(--muted)"/>
+          <text x="200" y="150" text-anchor="middle" class="svg-text-small" fill="var(--accent)">+1 row</text>
+          <text x="200" y="172" text-anchor="middle" class="svg-text-small" fill="var(--muted)">inserted</text>
+
+          <!-- T2 state -->
+          <text x="340" y="32" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">T2 — someone posts #104</text>
+          <rect x="280" y="48" width="120" height="220" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="340" y="68" text-anchor="middle" class="svg-text-small" fill="var(--accent)">post #104  ← NEW</text>
+          <line x1="290" y1="76" x2="390" y2="76" stroke="var(--rule)" stroke-width="0.5"/>
+          <text x="340" y="92" text-anchor="middle" class="svg-text-small">post #103</text>
+          <text x="340" y="108" text-anchor="middle" class="svg-text-small">post #102</text>
+          <text x="340" y="124" text-anchor="middle" class="svg-text-small">…</text>
+          <text x="340" y="148" text-anchor="middle" class="svg-text-small">post #85</text>
+          <text x="340" y="172" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">post #84  ← row 21</text>
+          <line x1="290" y1="180" x2="390" y2="180" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="340" y="196" text-anchor="middle" class="svg-text-small">post #83</text>
+          <text x="340" y="212" text-anchor="middle" class="svg-text-small">…</text>
+
+          <!-- Arrow -->
+          <line x1="420" y1="160" x2="460" y2="160" stroke="var(--muted)" stroke-width="1.5"/>
+          <polygon points="456,157 462,160 456,163" fill="var(--muted)"/>
+          <text x="440" y="150" text-anchor="middle" class="svg-text-small" fill="var(--muted)">user clicks</text>
+          <text x="440" y="172" text-anchor="middle" class="svg-text-small" fill="var(--muted)">"next"</text>
+
+          <!-- T3 state -->
+          <text x="580" y="32" text-anchor="middle" class="svg-text-bold" fill="var(--s3)">T3 — page 2 (offset 20)</text>
+          <rect x="520" y="48" width="120" height="220" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="580" y="68" text-anchor="middle" class="svg-text-small" fill="var(--muted)">offset 20:</text>
+          <text x="580" y="92" text-anchor="middle" class="svg-text-bold" fill="var(--accent)">post #84  ← DUP!</text>
+          <text x="580" y="108" text-anchor="middle" class="svg-text-small">post #83</text>
+          <text x="580" y="124" text-anchor="middle" class="svg-text-small">post #82</text>
+          <text x="580" y="140" text-anchor="middle" class="svg-text-small">…</text>
+          <text x="580" y="164" text-anchor="middle" class="svg-text-small">post #65</text>
+
+          <text x="580" y="290" text-anchor="middle" class="svg-text-small" fill="var(--ink)">page 2: rows 21–40</text>
+          <text x="580" y="306" text-anchor="middle" class="svg-text-small" fill="var(--accent)">#84 appears twice</text>
+        </svg>
+        <p class="figure-caption">Offset is computed against the table's <em>current</em> state every time. An insert at the head shifts every row down by one; the row that was at position 20 is now at position 21, so it appears at the top of page 2 too. Deletions cause the mirror-image bug — rows skip and never appear at all.</p>
+      </div>
+
+      <p>This sounds minor until you've built a feed. A user scrolling through "page 1, 2, 3" of a live-updating timeline sees duplicates and gaps. Worse: if the sort key changes (a post is edited and <code>updated_at</code> jumps), every subsequent page is scrambled, because the row's position in the ordering moved while the user was paginating.</p>
+
+      <p>Both problems share a root cause: <strong>offset is computed against the current state of the table at query time</strong>. There's no stable handle on "where I was." The fix is to give the client one.</p>
+
+      <h2 id="cursor"><span class="num">04</span>Cursor pagination</h2>
+
+      <p>Instead of "skip 40 rows", say "give me what comes after <em>this</em> row". The "this" is a <strong>cursor</strong> — typically the sort key of the last row from the previous page, often base64-encoded so it looks opaque to clients.</p>
+
+      <div class="codeblock"><code>GET /posts?limit=20
+→ { "results": [...], "next_cursor": "eyJpZCI6MTIzfQ" }
+
+GET /posts?limit=20&amp;cursor=eyJpZCI6MTIzfQ
+→ { "results": [...], "next_cursor": "..." }</code></div>
+
+      <p>Server runs (predicate depends on the sort key):</p>
+
+      <div class="codeblock"><code>SELECT * FROM posts WHERE id &lt; 123 ORDER BY id DESC LIMIT 20;</code></div>
+
+      <p>For a feed sorted by <code>created_at</code> with ties broken by <code>id</code>, the query is a tuple comparison so duplicates at the same timestamp don't slip:</p>
+
+      <div class="codeblock"><code>SELECT * FROM posts
+WHERE (created_at, id) &lt; ($cursor_ts, $cursor_id)
+ORDER BY created_at DESC, id DESC
+LIMIT 20;</code></div>
+
+      <div class="figure">
+        <div class="figure-label">Figure 03 — Cursor pagination as a moving handle</div>
+        <svg viewBox="0 0 640 280" xmlns="http://www.w3.org/2000/svg">
+          <!-- timeline of rows -->
+          <text x="40" y="32" class="svg-text-bold" fill="var(--ink)">posts (sorted desc by id)</text>
+
+          <rect x="40" y="50" width="560" height="46" rx="4" fill="var(--paper-warm)" stroke="var(--rule)"/>
+          <text x="56" y="78" class="svg-text-small">#103</text>
+          <text x="100" y="78" class="svg-text-small">#102</text>
+          <text x="144" y="78" class="svg-text-small">#101</text>
+          <text x="188" y="78" class="svg-text-small">#100</text>
+          <text x="232" y="78" class="svg-text-small">#99</text>
+          <text x="272" y="78" class="svg-text-small">#98</text>
+          <text x="312" y="78" class="svg-text-small">#97</text>
+          <text x="352" y="78" class="svg-text-small">…</text>
+          <text x="392" y="78" class="svg-text-small">#85</text>
+          <text x="432" y="78" class="svg-text-small">#84</text>
+          <text x="472" y="78" class="svg-text-small">#83</text>
+          <text x="512" y="78" class="svg-text-small">#82</text>
+          <text x="552" y="78" class="svg-text-small">…</text>
+
+          <!-- Page 1 marker -->
+          <rect x="40" y="44" width="412" height="58" rx="4" fill="none" stroke="var(--s1)" stroke-width="2"/>
+          <text x="246" y="120" text-anchor="middle" class="svg-text-bold" fill="var(--s1)">page 1: limit=20</text>
+          <text x="246" y="138" text-anchor="middle" class="svg-text-small" fill="var(--muted)">cursor= (none) → server returns rows ending at #84</text>
+
+          <!-- Page 2 query -->
+          <line x1="442" y1="158" x2="442" y2="180" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="442" y="172" text-anchor="middle" class="svg-text-small" fill="var(--accent)">cursor = 84</text>
+
+          <rect x="455" y="184" width="170" height="46" rx="4" fill="var(--s2-soft)" stroke="var(--s2)" stroke-width="2"/>
+          <text x="475" y="208" class="svg-text-small">#83</text>
+          <text x="510" y="208" class="svg-text-small">#82</text>
+          <text x="545" y="208" class="svg-text-small">#81</text>
+          <text x="580" y="208" class="svg-text-small">…</text>
+
+          <text x="540" y="252" text-anchor="middle" class="svg-text-bold" fill="var(--s2)">page 2: cursor=84, limit=20</text>
+          <text x="540" y="270" text-anchor="middle" class="svg-text-small" fill="var(--muted)">WHERE id &lt; 84 — indexed seek, no scan</text>
+        </svg>
+        <p class="figure-caption">The cursor is the trailing edge of the previous page. The next query becomes "rows where the sort key is less than the cursor", which an index can answer with one seek. Inserts above the cursor don't affect the result; the user keeps walking forward through what they've already seen.</p>
+      </div>
+
+      <p>Why it's better:</p>
+
+      <ul>
+        <li><strong><code>O(log N)</code> per page</strong>, not <code>O(offset)</code>. The database does an indexed seek to the cursor position; the offset doesn't appear in the query at all.</li>
+        <li><strong>Stable across inserts and deletes.</strong> New posts at the top don't shift you — the cursor is anchored to a specific row, not a position. You keep walking forward through the data you've already seen.</li>
+        <li><strong>Natural fit for infinite-scroll UIs.</strong> Every "fetch more" call is just "give me what comes after the last thing I have."</li>
+      </ul>
+
+      <p>What you give up:</p>
+
+      <ul>
+        <li><strong>Can't jump to "page 50".</strong> Only forward (and sometimes backward) sequentially. If the UI needs random-access pagination — "Page 50 of 200" with clickable page numbers — cursor doesn't fit.</li>
+        <li><strong>Need a stable, monotonic sort key.</strong> Usually the primary key or a <code>(created_at, id)</code> tuple. If the sort changes mid-walk, the cursor's meaning breaks.</li>
+        <li><strong>Cursor should be opaque.</strong> If you expose <code>cursor=12345</code>, clients will start crafting their own. Signing or encrypting the cursor keeps the contract under your control and avoids leaking schema details.</li>
+      </ul>
+
+      <h2 id="pick"><span class="num">05</span>When to pick which</h2>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Reach for offset/limit when…</h4>
+          <ul>
+            <li>The dataset is small and bounded (admin lists, settings, lookup tables).</li>
+            <li>The UX requires "Page N of M" with clickable page numbers.</li>
+            <li>The user routinely needs to jump to a specific page.</li>
+            <li>Writes are rare or paused during the user's session.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Reach for cursor when…</h4>
+          <ul>
+            <li>The dataset grows unbounded (feeds, search results, logs).</li>
+            <li>The UI is infinite-scroll or "load more".</li>
+            <li>Live writes are happening while users paginate.</li>
+            <li>Users routinely page deep into the dataset.</li>
+          </ul>
+        </div>
+      </div>
+
+      <p>The rough rule: <strong>if your dataset can have a million rows and users routinely scroll past the first thousand, you want cursor.</strong> Offset is fine until the offsets get big — and then it's not, all at once.</p>
+
+      <div class="callout">
+        <div class="callout-label">Hybrid pagination</div>
+        Some APIs offer both: cursor pagination by default for forward scrolling, with an optional <code>page</code>/<code>page_size</code> mode for admin tooling that needs jump-to-page. The two cost models are different and should be exposed as different endpoints (or different query parameters that can't be mixed) — not as a flag the client toggles invisibly.
+      </div>
+
+      <h2 id="takeaway"><span class="num">06</span>The one-line takeaway</h2>
+
+      <p class="pullquote">Offset says "skip the first N rows". Cursor says "give me what comes after this row". The latter is what indexes are good at — and what stays consistent when writes are happening underneath.</p>
+
+      <p>Both styles look the same to a small-dataset eye, which is why offset is the natural first choice. The day the cliff arrives — the day a user with a long inbox or a script crawling deep pages hits the back of the table — the cost of switching to cursor is high, because clients have already baked <code>page=N</code> into their integration. Picking cursor up front, even if the UX shows page numbers, is the cheap insurance. The page numbers can be a thin client-side projection over a cursor underneath.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#offset-pagination">offset pagination</a><a href="../glossary.html#cursor-pagination">cursor pagination</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="api-design.html">
+              <span class="related-arrow">→</span>
+              <span>API Design</span>
+              <span class="related-summary">— pagination is one of the contract decisions REST inherits.</span>
+            </a>
+          </li>
+          <li>
+            <a href="api-best-practices.html">
+              <span class="related-arrow">→</span>
+              <span>API Design Best Practices</span>
+              <span class="related-summary">— "always paginate list endpoints" and the other six habits that keep contracts honest.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../performance/throughput.html">
+              <span class="related-arrow">→</span>
+              <span>Throughput</span>
+              <span class="related-summary">— why deep-offset queries saturate the DB and starve everyone.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../distribution/consistent-hashing.html">
+              <span class="related-arrow">→</span>
+              <span>Consistent Hashing</span>
+              <span class="related-summary">— another "stable handle on placement" idea, applied to nodes instead of rows.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 05 · Interfaces. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>

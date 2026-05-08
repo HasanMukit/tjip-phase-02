@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Design Best Practices — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+          <a href="../resources.html">Resources</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Interfaces</a></div>
+        <h1>API design <em>best practices</em></h1>
+        <p class="deck">Eleven habits that separate an API a client wants to keep using from one a client merely tolerates — naming, idempotency, versioning, pagination, query strings, predictable responses, security, simple references, async handoffs, range requests, OpenAPI docs — plus the rate-limiting plan most teams ship too late.</p>
+        <div class="meta">
+          <span class="class-pill">Class 05</span>
+          <span>Theme · Interfaces</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">What's inside</div>
+        <ol>
+          <li><a href="#why">Why "best practice" is a load-bearing word here</a></li>
+          <li><a href="#naming">01 — Use clear, consistent naming</a></li>
+          <li><a href="#idempotency">02 — Ensure reliability through idempotent endpoints</a></li>
+          <li><a href="#versioning">03 — Plan for versioning from day one</a></li>
+          <li><a href="#pagination">04 — Always paginate list endpoints</a></li>
+          <li><a href="#querystrings">05 — Clear query strings — filter, sort, search, partial responses</a></li>
+          <li><a href="#responses">06 — Make responses and errors predictable</a></li>
+          <li><a href="#security">07 — Don't make security an afterthought</a></li>
+          <li><a href="#references">08 — Keep cross-resource references simple</a></li>
+          <li><a href="#async">09 — Hand long operations off asynchronously</a></li>
+          <li><a href="#range">10 — Support range requests for large resources</a></li>
+          <li><a href="#openapi">11 — Document with OpenAPI</a></li>
+          <li><a href="#ratelimit">Bonus — Plan for rate limiting</a></li>
+          <li><a href="#takeaway">The one-line takeaway</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">An API is the part of your system that's hardest to change once it's in the wild. Internal code can be refactored on a Friday afternoon; a public field name lives until every client has migrated off it, which in practice means forever. The choices that look stylistic at design time — singular or plural, header or query string, <code>v1</code> in the URL or in a header — turn into commitments the moment the first client integrates. The cost of getting them right up front is small. The cost of getting them wrong is paid in deprecation timelines.</p>
+
+      <p>This page collects eleven habits that consistently separate APIs people enjoy integrating with from APIs people complain about, plus a bonus tip on rate limiting that bites every public API the moment it gets popular. They're orthogonal — you can adopt them in any order — but they reinforce each other: a clearly named, properly versioned, idempotent, paginated, well-secured, well-documented API with predictable response shapes and a real plan for long-running work is one whose contract a client can read once and trust.</p>
+
+      <p>Each tip points back to the page where the underlying mechanic is explained in depth. If a tip refers to retries, it's because <a class="glink" href="api-design.html#idempotency">making <code>POST</code> safe to retry</a> is a topic of its own. If it refers to cursor pagination, the math and trade-offs are on the <a class="glink" href="pagination.html">pagination page</a>. This page is the playbook; the others are the proofs.</p>
+
+      <h2 id="why"><span class="num">00</span>Why "best practice" is a load-bearing word here</h2>
+
+      <p>"Best practice" usually means "convention worth following because the alternative is mildly worse." On an API, it means something stronger: every one of these habits has a corresponding production failure mode the moment you skip it. Bad naming creates clients that hard-code typos. Non-idempotent <code>POST</code>s double-charge customers when retries fire. No versioning strategy means breaking clients on every release. No pagination means a 5 GB response that crashes the mobile app. Sensitive data in query strings ends up in nginx logs forever. Deeply nested URLs lock you into a hierarchy that next quarter's product manager will want to break.</p>
+
+      <p class="pullquote">Every "best practice" below is a real outage someone else has already paid for. Treat them as the cheapest insurance you'll ever buy.</p>
+
+      <h2 id="naming"><span class="num">01</span>Use clear, consistent naming</h2>
+
+      <p>The URL is the most public part of the contract. Every client integration starts with a developer reading a path and forming an expectation about what it returns. A path that follows conventions is read once; a path that doesn't is read three times and still gets confused with another endpoint a year later.</p>
+
+      <h3>Use nouns, not verbs</h3>
+
+      <p>The verb is already in the HTTP method. Repeating it in the path is redundant and breaks the pattern that makes REST legible.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Don't</h4>
+          <div class="codeblock"><code>GET    /getUsers
+POST   /createUser
+POST   /deleteUser/123
+GET    /fetchUserOrders?id=123
+POST   /updateUserEmail</code></div>
+          <p>The verb is duplicated, the case style is inconsistent, and <code>POST /deleteUser</code> hides the actual semantics behind the wrong method.</p>
+        </div>
+        <div class="card">
+          <h4>Do</h4>
+          <div class="codeblock"><code>GET    /users
+POST   /users
+DELETE /users/123
+GET    /users/123/orders
+PATCH  /users/123</code></div>
+          <p>The path names a resource, the verb describes the action. A new client can guess <code>GET /products</code>, <code>DELETE /products/45</code> without consulting the docs.</p>
+        </div>
+      </div>
+
+      <h3>Singular vs plural — the rule that's actually a rule</h3>
+
+      <p>The convention is simple and almost universally followed by APIs people don't complain about:</p>
+
+      <ul>
+        <li><strong>Plural for collections</strong> — <code>/users</code> is the set of all users. <code>GET /users</code> lists them. <code>POST /users</code> creates a new one.</li>
+        <li><strong>Plural + ID for an instance</strong> — <code>/users/123</code> is one specific user. <code>GET /users/123</code> reads it; <code>DELETE /users/123</code> removes it. The plural is kept because <em>123 is one element of <code>users</code></em>, not a different resource.</li>
+        <li><strong>Singular only for genuine singletons</strong> — <code>/me</code>, <code>/health</code>, <code>/config</code>. There's exactly one. A plural would be a lie.</li>
+      </ul>
+
+      <div class="codeblock"><code>GET  /users           # list users (plural collection)
+GET  /users/123       # one user (still plural — 123 is in the set)
+GET  /users/123/orders  # that user's orders (plural sub-collection)
+GET  /users/123/orders/45  # one of their orders
+GET  /me              # the authenticated caller — a singleton, so singular</code></div>
+
+      <p>Mixing styles (<code>/user</code> for one, <code>/users</code> for many) doubles the surface a client has to remember and breaks every URL-completion tool that assumes the plural is canonical.</p>
+
+      <h3>Be consistent — pick a case style and never switch</h3>
+
+      <p>Pick one and apply it everywhere: <code>kebab-case</code> for paths (<code>/payment-methods</code>, not <code>/paymentMethods</code> or <code>/payment_methods</code>) and <code>snake_case</code> or <code>camelCase</code> for JSON fields (<code>created_at</code> vs <code>createdAt</code>). The <em>which</em> matters less than the <em>consistency</em>. Mixing styles forces the client to remember the spelling of every endpoint individually instead of one rule.</p>
+
+      <div class="callout">
+        <div class="callout-label">Names you don't get to fix</div>
+        Public path names and field names are part of the contract. Once a paying customer integrates, renaming <code>created_at</code> to <code>createdAt</code> breaks them. The cheap fix at design time becomes a multi-quarter migration the moment you ship. Spend the extra five minutes picking a name you're willing to keep.
+      </div>
+
+      <h2 id="idempotency"><span class="num">02</span>Ensure reliability through idempotent endpoints</h2>
+
+      <p>Networks fail. Retries are not optional — every modern client framework retries automatically on 5xx and connection errors, often without the developer realising. The question is whether your API survives the retries or compounds them into duplicate state.</p>
+
+      <p>The HTTP spec is explicit about which methods are <a class="glink" href="../glossary.html#idempotency">idempotent</a> by default. Calling them once and calling them five times leave the server in the same state:</p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Verb</th>
+            <th>Idempotent by default?</th>
+            <th>What that buys you</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono">GET</td>
+            <td>yes</td>
+            <td>Safe to retry, cache, prefetch, hit speculatively.</td>
+          </tr>
+          <tr>
+            <td class="mono">PUT</td>
+            <td>yes</td>
+            <td>Replace-with-X applied twice is the same as once.</td>
+          </tr>
+          <tr>
+            <td class="mono">DELETE</td>
+            <td>yes</td>
+            <td>Deleting an already-deleted thing is a no-op (or a 404 — still safe).</td>
+          </tr>
+          <tr>
+            <td class="mono">POST</td>
+            <td><strong>no</strong></td>
+            <td>Two <code>POST /orders</code> calls create two orders unless you intervene.</td>
+          </tr>
+          <tr>
+            <td class="mono">PATCH</td>
+            <td>depends</td>
+            <td>JSON Merge Patch: yes. JSON Patch with <code>add</code> ops: no.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Honour the spec.</strong> If your <code>PUT /users/123</code> creates a new user instead of replacing one, or your <code>DELETE</code> errors on the second call, retrying clients will see incorrect behaviour they have no way to predict. Idempotency isn't a property you opt into per endpoint; it's a contract the verb already promises.</p>
+
+      <p>For the operations that aren't idempotent by default — chiefly <code>POST</code> and side-effectful <code>PATCH</code> — make them idempotent on purpose. The two patterns are covered in detail on the <a class="glink" href="api-design.html#idempotency">main API design page</a>:</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a href="api-design.html#idempotency">Idempotency-Key header</a></h4>
+          <p>Client generates a UUID, server stores the full response under it, retries replay the stored answer. General-purpose; works for any operation. Stripe popularised it.</p>
+        </div>
+        <div class="card">
+          <h4><a href="api-design.html#idempotency">Natural-key dedup</a></h4>
+          <p>The request already carries something unique (<code>order_id</code>, <code>(user_id, day, type)</code>). A unique constraint plus an upsert dedupes at the storage layer with no extra header.</p>
+        </div>
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">Idempotency is a precondition, not a feature</div>
+        Every <a class="glink" href="../reliability/resilience-patterns.html">resilience pattern</a> that involves retries — exponential backoff, retry budgets, circuit-breaker probes, hedged requests — assumes the underlying operation is idempotent. If it isn't, retries don't make the system more reliable; they make it more broken, faster.
+      </div>
+
+      <h2 id="versioning"><span class="num">03</span>Plan for versioning from day one</h2>
+
+      <p>Every API will eventually need a breaking change. A field renamed for clarity, a response shape simplified, a status code changed from 200 to 202 because the operation went async. The question isn't whether you'll need a v2 — it's whether you've already chosen how v1 and v2 will coexist.</p>
+
+      <p>Three common strategies, in rough order of how often they're picked:</p>
+
+      <h3>URL versioning — the obvious one</h3>
+
+      <div class="codeblock"><code>GET /v1/users/123
+GET /v2/users/123</code></div>
+
+      <p>Clients pick a version explicitly in the path. New version is a new tree. Easy to implement, easy to debug (the URL tells you everything), easy to deprecate (turn off the old subtree). The downside: every URL has a version segment forever. Most successful public APIs (Stripe, GitHub for early versions, Twilio) use this.</p>
+
+      <h3>Header versioning</h3>
+
+      <div class="codeblock"><code>GET /users/123
+Accept: application/vnd.acme.v2+json
+# or
+API-Version: 2</code></div>
+
+      <p>The path stays clean; the version moves into a header. URLs are stable forever. The downside: invisible from the URL — testing with <code>curl</code> needs an extra flag, CDN caching has to vary on the header, and an unset header has to default somewhere (which is its own minor footgun). GitHub's modern API uses this; Stripe uses a date-based variant (<code>Stripe-Version: 2024-04-01</code>).</p>
+
+      <h3>Query-parameter versioning</h3>
+
+      <div class="codeblock"><code>GET /users/123?version=2</code></div>
+
+      <p>Possible, but rarely the right call. Query parameters are usually for filtering/sorting, and putting versioning there muddies that meaning. If you need it, header versioning is almost always the cleaner version of the same idea.</p>
+
+      <h3>Communicate deprecation</h3>
+
+      <p>When a version is going away, say so in the response, not just in a blog post. Two HTTP headers exist for exactly this:</p>
+
+      <div class="codeblock"><code>Deprecation: true
+Sunset: Wed, 31 Dec 2026 23:59:59 GMT
+Link: &lt;https://api.example.com/v2/users/123&gt;; rel="successor-version"</code></div>
+
+      <p>Clients that monitor headers can surface the warning before the cutover; observability dashboards can count how many requests are still hitting the deprecated path. Cold deprecations (a blog post and silence on the wire) leave you guessing.</p>
+
+      <h3>Keep at least one previous version alive</h3>
+
+      <p>When a new version ships, the old one stays available — typically for at least one full release cycle, often a year for paid public APIs. The point isn't generosity; it's that every integrated client has its own deploy pipeline, and forcing them to migrate on your schedule is how you turn a routine release into a partner incident. Pair the overlap window with a stated <code>Sunset</code> date and visible deprecation traffic so the cutover lands when the dashboards say it can.</p>
+
+      <div class="callout">
+        <div class="callout-label">"What counts as a breaking change?"</div>
+        <strong>Adding</strong> a field is non-breaking — old clients ignore it. <strong>Removing or renaming</strong> a field is breaking — old clients read the missing key as null. <strong>Changing a type</strong> (string to number, scalar to array) is always breaking. <strong>Tightening validation</strong> can be breaking even if the schema looks the same — a field that used to accept empty strings no longer doing so will surprise someone. Treat additive change as free; treat anything else as a v-bump.
+      </div>
+
+      <h2 id="pagination"><span class="num">04</span>Always paginate list endpoints</h2>
+
+      <p>A list endpoint is a small lie — <code>GET /posts</code> looks like one operation, but the result set might be ten rows or ten million. Returning everything in one response burns memory on both sides, blows past the bandwidth budget, and pushes time-to-first-byte into the seconds. Even if today's table is tiny, adopt the pagination contract from the first version. Adding pagination later is a breaking change; baking it in is free.</p>
+
+      <p>Two main styles, with very different cost models. Both are covered with figures and SQL on the <a class="glink" href="pagination.html">pagination page</a>; the summary here is enough to pick.</p>
+
+      <div class="two-col">
+        <div class="card">
+          <h4><a href="pagination.html#offset">Offset / limit</a></h4>
+          <div class="codeblock"><code>GET /posts?limit=20&amp;offset=40</code></div>
+          <p>Maps cleanly to "Page 3 of 50" UIs. Two failure modes: <strong>O(offset)</strong> cost at deep pages, and <strong>inconsistency</strong> when writes happen mid-walk (rows shift, duplicates and gaps appear).</p>
+          <p><strong>Reach for it when</strong> the dataset is small, bounded, and the UX needs random-access page numbers.</p>
+        </div>
+        <div class="card">
+          <h4><a href="pagination.html#cursor">Cursor</a></h4>
+          <div class="codeblock"><code>GET /posts?limit=20&amp;cursor=eyJpZCI6MTIzfQ</code></div>
+          <p>"Give me what comes after this row." <strong>O(log N) per page</strong>, stable under inserts and deletes, natural fit for infinite-scroll. Costs: forward-only, needs a stable sort key.</p>
+          <p><strong>Reach for it when</strong> the dataset grows unbounded or live writes happen while users paginate. The default for feeds, search, audit logs.</p>
+        </div>
+      </div>
+
+      <p class="pullquote">If your dataset can have a million rows and users routinely scroll past the first thousand, you want cursor — and even if it never gets that big, the contract costs nothing extra.</p>
+
+      <h2 id="querystrings"><span class="num">05</span>Clear query strings — filter, sort, search, partial responses</h2>
+
+      <p>Once you've named the resource correctly and paginated the list, the next question every client asks is "can I narrow it down?" That's what query strings exist for. Four common needs — filtering, sorting, search, and asking for a subset of fields — each have a convention worth following.</p>
+
+      <h3>Filter and sort — separate parameters, separate purposes</h3>
+
+      <div class="codeblock"><code>GET /products?category=shoes&amp;color=red&amp;in_stock=true
+GET /products?sort=price&amp;order=asc
+GET /orders?status=pending&amp;created_after=2026-01-01</code></div>
+
+      <p>A few rules that compound nicely:</p>
+
+      <ul>
+        <li><strong>One field, one parameter.</strong> <code>?status=pending</code>, not <code>?filter=status:pending</code>. Each filter should be a top-level key, not a mini-query-language inside a value. Half of "GraphQL was a mistake" stories are really "we built a query language inside our query string".</li>
+        <li><strong>Sort gets two knobs, not one.</strong> <code>?sort=price&amp;order=asc</code> is clearer than <code>?sort=-price</code>. The clever-trick form (a leading <code>-</code> for descending) saves three characters and confuses every junior engineer who joins the team.</li>
+        <li><strong>Use the same parameter names everywhere.</strong> If <code>created_after</code> means "ISO timestamp, exclusive lower bound" on one endpoint, it should mean exactly that on every other endpoint that takes it. The contract is the predictability, not the keyword.</li>
+      </ul>
+
+      <h3>Search — a different verb than filter</h3>
+
+      <p>Filtering excludes by predicate ("only orders with <code>status=pending</code>"). Searching ranks by relevance ("find anything that looks like 'running shoes'"). They're different operations and deserve different conventions:</p>
+
+      <div class="codeblock"><code>GET /products?q=running+shoes              # search within /products
+GET /search?q=running+shoes                # global search across resources
+GET /search?q=running+shoes&amp;scope=products,brands   # scoped global search</code></div>
+
+      <ul>
+        <li><strong>Use <code>q</code> as the shorthand</strong> for the query string — convention since at least early Google. Pick <code>q</code> or <code>search</code> and stick with it; don't mix.</li>
+        <li><strong>Separate terms with <code>+</code></strong> (URL-encoded space). Multi-word queries shouldn't need their own escaping rules.</li>
+        <li><strong>For multi-resource search</strong>, expose a top-level <code>/search</code> endpoint and let the client narrow the <code>scope</code>. This is the one place where a verb in the URL is fine — search is an action, not a resource.</li>
+      </ul>
+
+      <h3>Partial responses — let clients ask for less</h3>
+
+      <p>Sometimes a client only needs three fields out of thirty. REST endpoints return what they return, which is the over-fetching complaint that drives teams to GraphQL. The cheaper fix: a <code>fields</code> parameter that names the fields the client wants.</p>
+
+      <div class="codeblock"><code>GET /users/123?fields=id,name,email
+GET /products?fields=id,name,price&amp;limit=20</code></div>
+
+      <ul>
+        <li><strong>Comma-separated list of field names</strong> — the standard shape. Stripe, GitHub, JSON:API all converge on this with minor syntactic variations.</li>
+        <li><strong>Skip-validate aggressively.</strong> Unknown field names should error, not silently drop — typos shouldn't return the full payload.</li>
+        <li><strong>Pair with <code>?expand=</code>.</strong> <code>fields</code> trims down the default shape; <code>expand</code> opts into nested objects (see "Keep cross-resource references simple" below). Together they give clients control in both directions without committing you to a query language.</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-label">Heads-up: query strings and caching</div>
+        Some older HTTP proxies and CDNs strip or ignore query parameters when computing cache keys — meaning <code>/products?category=shoes</code> and <code>/products?category=hats</code> can collapse into one cached entry on a misconfigured intermediary. Modern CDNs (Cloudflare, Fastly, CloudFront) handle this correctly, but it's a footgun in older infra. The fix is configuration-level, not contract-level — but worth knowing the trap exists when "why is this user seeing the wrong list?" surfaces in production.
+      </div>
+
+      <h3>Combine cleanly with pagination</h3>
+
+      <p>Filters, sort, fields, and pagination should layer without surprising interactions. The cursor encodes "where I left off in the filtered, sorted result"; new filter values invalidate the cursor (which is fine — the client just starts over).</p>
+
+      <div class="codeblock"><code>GET /orders?status=pending&amp;sort=created_at&amp;order=desc&amp;limit=20
+GET /orders?status=pending&amp;sort=created_at&amp;order=desc&amp;limit=20&amp;fields=id,total,created_at&amp;cursor=eyJ0c19c...</code></div>
+
+      <h2 id="responses"><span class="num">06</span>Make responses and errors predictable</h2>
+
+      <p>The shape of a successful response is half the contract; the shape of an error response is the other half. Clients write conditionals against both. Picking — and documenting — a consistent shape early means every endpoint feels like part of the same API instead of a federation of micro-services that each invented their own rules.</p>
+
+      <h3>Content negotiation — let the client ask, but pick a default</h3>
+
+      <p>The HTTP <code>Accept</code> header is exactly the mechanism for "I'd like the response in format X". A well-behaved API honours it:</p>
+
+      <div class="codeblock"><code>GET /users/123 HTTP/1.1
+Accept: application/json
+# server responds with JSON
+
+GET /users/123 HTTP/1.1
+Accept: application/xml
+# server responds with XML if supported, or 406 Not Acceptable</code></div>
+
+      <p>Two rules that handle 95% of cases:</p>
+
+      <ul>
+        <li><strong>Default to JSON</strong> when the client doesn't specify a preference. JSON is the lingua franca of public APIs in 2026; clients without an explicit <code>Accept</code> header almost always want it.</li>
+        <li><strong>Document every supported format.</strong> If you don't support XML, say so — and return <code>406 Not Acceptable</code> when a client asks for it, not a silent JSON fallback that confuses parsers expecting one thing and getting another.</li>
+      </ul>
+
+      <p>Errors should come back in the same format as the rest of the API. A JSON endpoint that returns an HTML stack trace on 500 is a contract violation in itself — clients can't parse it, monitoring tools can't aggregate it, and the on-call engineer won't even see it in the dashboard.</p>
+
+      <h3>Error response shape — code, message, hint, link</h3>
+
+      <p>HTTP status codes carry the high-level verdict; the body carries the detail. Both belong in the contract.</p>
+
+      <p>Three categories cover almost everything:</p>
+
+      <ul>
+        <li><strong>2xx — success.</strong> The request worked. <code>200 OK</code> for most reads and updates, <code>201 Created</code> for new resources (with a <code>Location</code> header pointing at the new URL), <code>204 No Content</code> when there's nothing to return.</li>
+        <li><strong>4xx — the client did something wrong.</strong> <code>400 Bad Request</code> (malformed), <code>401 Unauthorized</code> (no/bad credentials), <code>403 Forbidden</code> (authenticated but not allowed), <code>404 Not Found</code>, <code>409 Conflict</code>, <code>422 Unprocessable Entity</code> (validation failed), <code>429 Too Many Requests</code>.</li>
+        <li><strong>5xx — the server failed.</strong> <code>500</code> for "we don't know", <code>502</code>/<code>503</code>/<code>504</code> for upstream / unavailable / timeout. The client did nothing wrong; the right behaviour is usually a retry (assuming idempotency).</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-label">Pick a small set and use them consistently</div>
+        Eight status codes covers most APIs (<code>200</code>, <code>201</code>, <code>204</code>, <code>400</code>, <code>401</code>, <code>403</code>, <code>404</code>, <code>500</code>); a streamlined set of three (<code>200</code>, <code>4xx</code>, <code>5xx</code>) is also defensible for very simple APIs. The point isn't <em>which</em> codes — it's that the same code means the same thing on every endpoint. Inventing <code>418 I'm a teapot</code> for "user is rate-limited" is funny exactly once.
+      </div>
+
+      <p>Inside the body, return enough for both humans and machines to act on the error. The pattern most public APIs converge on (and that <a href="https://www.rfc-editor.org/rfc/rfc7807">RFC 7807 Problem Details</a> standardised):</p>
+
+      <div class="codeblock"><code>HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+
+{
+  "type":    "https://api.example.com/errors/invalid-email",
+  "title":   "Invalid email address",
+  "status":  422,
+  "code":    "validation.email_invalid",
+  "detail":  "The 'email' field must be a valid RFC 5322 address.",
+  "hint":    "Common cause: missing '@' or trailing whitespace.",
+  "link":    "https://docs.example.com/errors/invalid-email",
+  "trace_id": "7f8a3c12-9e4b-4d1a-b2e7-1c0f8d9a4e22"
+}</code></div>
+
+      <ul>
+        <li><strong><code>code</code></strong> — a stable machine-readable identifier (<code>validation.email_invalid</code>). Clients write conditionals against this, not against <code>title</code>. Never reuse a code for a different meaning; never localise it.</li>
+        <li><strong><code>title</code> / <code>detail</code></strong> — short and long human-readable messages. Localise <code>detail</code> if you support i18n.</li>
+        <li><strong><code>hint</code></strong> — a one-line nudge toward the fix. Almost every developer-facing API benefits from this; it's the difference between "validation failed" and "validation failed; check that the email contains an '@'".</li>
+        <li><strong><code>link</code></strong> — a URL to the error's page in the docs. Doubles as a stable identifier the support team can refer back to.</li>
+        <li><strong><code>trace_id</code></strong> — the server's correlation ID for this request. When a customer reports "I got error X at 14:32", you can find the exact log line without grepping.</li>
+      </ul>
+
+      <p>Use the same envelope on every endpoint. A 401 from the auth service and a 422 from the orders service should look like the same JSON shape — the client's error-handling code is written once, not per service.</p>
+
+      <div class="callout">
+        <div class="callout-label">Helpful to developers, useless to attackers</div>
+        Errors should explain enough for a legitimate developer to fix the call, never enough for an attacker to map your internals. <strong>Don't</strong> return raw stack traces, SQL fragments, ORM class names, internal hostnames, file paths, or which row of a JOIN failed. <strong>Do</strong> return a stable <code>code</code>, a generic <code>title</code>, a <code>trace_id</code> the support team can correlate against logs, and — for <code>401</code>/<code>404</code> on protected resources — the <em>same</em> message whether the resource doesn't exist or the caller isn't allowed to see it. Distinguishing the two leaks the existence of resources to unauthorised callers.
+      </div>
+
+      <h2 id="security"><span class="num">07</span>Don't make security an afterthought</h2>
+
+      <p>Security retrofits are expensive, brittle, and almost always incomplete. Three habits, baked in from day one, prevent most of the common API breaches.</p>
+
+      <h3>Sensitive data goes in headers, not query strings</h3>
+
+      <p>Query strings are the worst place to put anything sensitive. They end up in:</p>
+
+      <ul>
+        <li><strong>Browser history</strong> — the user's machine remembers <code>?token=...</code> forever.</li>
+        <li><strong>Server access logs</strong> — nginx and most proxies log the full URL by default. Tokens and API keys land in plaintext on disk.</li>
+        <li><strong>The <code>Referer</code> header</strong> — when the page links out, the next site sees the URL.</li>
+        <li><strong>Analytics and APM tools</strong> — anything that captures URLs captures the secret in the URL.</li>
+      </ul>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Don't</h4>
+          <div class="codeblock"><code>GET /orders?api_key=sk_live_abc123
+GET /users?password=hunter2</code></div>
+        </div>
+        <div class="card">
+          <h4>Do</h4>
+          <div class="codeblock"><code>GET /orders
+Authorization: Bearer sk_live_abc123
+
+POST /login
+Content-Type: application/json
+{"password": "hunter2"}</code></div>
+        </div>
+      </div>
+
+      <p>Headers and request bodies aren't logged by default in most stacks. They're still encrypted on the wire (see below). The bar is "would I be comfortable if this string showed up in a Splunk dashboard?" — and for tokens, the answer is no.</p>
+
+      <h3>TLS everywhere — no exceptions for "internal"</h3>
+
+      <p>Every modern browser refuses plain HTTP for anything serious; treat your own services the same way. <a class="glink" href="https-handshake.html">TLS</a> gives you three things HTTP doesn't — encryption, integrity, authentication — and the cost is one round-trip per fresh connection (or zero with TLS 1.3 session resumption). The <a class="glink" href="https-handshake.html">HTTPS handshake page</a> walks the math; the practical version is: redirect HTTP to HTTPS, set <code>Strict-Transport-Security</code>, and refuse plaintext in the API gateway. Internal service-to-service traffic should also use TLS — "the internal network is trusted" stops being true the first time someone pivots through a compromised service.</p>
+
+      <h3>Use OAuth 2.0 (and OIDC) — don't invent your own auth flow</h3>
+
+      <p>For anything beyond a personal API key, the answer to "how should clients authenticate?" is <strong>OAuth 2.0</strong>. It's the standard authorisation framework for APIs in 2026 — supported by every major identity provider, every modern HTTP library, every API gateway. The grant types map to real client shapes (Authorization Code + PKCE for web/mobile, Client Credentials for service-to-service, Device Code for TVs and CLIs), and the token format (JWT or opaque) plugs into the verification step below. Layer <strong>OpenID Connect</strong> on top when you also need to identify <em>the user</em> rather than just authorise the call.</p>
+
+      <p>Home-grown auth schemes — custom signed cookies, hand-rolled HMAC headers, "just send the password on every request" — are where last quarter's CVE came from. The library exists; use it.</p>
+
+      <h3>Verify keys and tokens on every request</h3>
+
+      <p>Statelessness is one of REST's superpowers, but it has a corollary: the server can't trust anything about the caller from one request to the next unless the caller proves it again. So check the credential on every request, not just at session start.</p>
+
+      <ul>
+        <li><strong>Verify the signature</strong> on every JWT. A token that's "probably still valid because we issued it five minutes ago" is exactly the kind of assumption attackers exploit.</li>
+        <li><strong>Check expiry, scope, and audience</strong> — a token signed correctly but with the wrong audience or expired five minutes ago is no good.</li>
+        <li><strong>Authorize the action, not just the identity</strong> — knowing <em>who</em> is calling isn't the same as knowing <em>they're allowed to do this thing to this resource</em>. Authorization is per request, per resource.</li>
+        <li><strong>Don't roll your own crypto.</strong> Use a library that's been hardened (jose, libsodium, your platform's standard crypto). The home-grown HMAC checker is where last quarter's CVE came from.</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-label">Where this lives in the request path</div>
+        Most of this is the <a class="glink" href="../distribution/api-gateway-pipeline.html#gates">API gateway's job</a>. Authentication runs first, rate limiting second, then the request gets routed to a backend that already trusts the gateway's verdict. Putting auth deeper means every backend re-implements it; putting it at the gateway means one place hardens it.
+      </div>
+
+      <h2 id="references"><span class="num">08</span>Keep cross-resource references simple</h2>
+
+      <p>The temptation when designing URLs is to encode every relationship in the path: <code>/users/123/orders/45/items/9/refunds/2</code>. It feels neat — every slash mirrors the database join. It also locks you into a hierarchy that the product will outgrow within a year, and forces every client to know the entire tree just to reach a leaf.</p>
+
+      <p>There's a security angle too: a URL that reads like a schema diagram <em>is</em> a schema diagram. <code>/users/123/orders/45</code> tells anyone watching that user 123 has at least 45 orders, that orders are owned by users, and that internal IDs are sequential integers. Mirroring your database structure in your URLs leaks information you didn't have to leak; flat resources by ID (<code>/orders/45</code>) reveal less and let you renumber, partition, or reparent later without breaking every client URL.</p>
+
+      <h3>One level of nesting is plenty</h3>
+
+      <div class="two-col">
+        <div class="card">
+          <h4>Don't — deep nesting</h4>
+          <div class="codeblock"><code>GET /users/123/orders/45/items/9/refunds/2
+PATCH /companies/4/teams/2/members/8/permissions/3</code></div>
+          <p>Every URL leaks the entire path of ownership. Move an item between orders? URL changes. Reparent a team? Every saved URL breaks. Clients have to walk the tree to know IDs they shouldn't need.</p>
+        </div>
+        <div class="card">
+          <h4>Do — flat with explicit IDs</h4>
+          <div class="codeblock"><code>GET /refunds/2
+GET /refunds?order_id=45
+GET /permissions/3
+GET /permissions?member_id=8</code></div>
+          <p>Each resource has one canonical URL by ID. Relationships are query parameters when listing, fields in the body when reading. Reparenting changes a column, not a URL.</p>
+        </div>
+      </div>
+
+      <h3>Use IDs, not full embedded objects, by default</h3>
+
+      <p>When one resource references another, return the ID and let the client fetch the related resource if it needs to:</p>
+
+      <div class="codeblock"><code>// GET /orders/45
+{
+  "id": 45,
+  "user_id": 123,
+  "total": 5000,
+  "items": [9, 10, 11]   // IDs, not full item objects
+}</code></div>
+
+      <p>Reasons:</p>
+
+      <ul>
+        <li><strong>Response size stays predictable.</strong> An order doesn't accidentally drag 50 items, each with 30 fields, into a payload meant to be a list summary.</li>
+        <li><strong>Cache layers work.</strong> <code>/items/9</code> can be cached independently and served from a CDN; an embedded copy can't.</li>
+        <li><strong>Updates don't fan out.</strong> If an item changes, you don't have to invalidate every order that embedded it.</li>
+        <li><strong>Clients pick the depth they need.</strong> A list view fetches summaries; a detail view follows the IDs. This is the same problem GraphQL solves, but you get most of the benefit by not over-embedding in the first place.</li>
+      </ul>
+
+      <p>Optionally support an <code>?expand=items</code> parameter for clients that genuinely need the join in one round-trip. Stripe's <code>expand</code>, GitHub's sparse fieldsets, JSON:API's <code>include</code> are all variations of the same idea: flat by default, expandable on demand.</p>
+
+      <h2 id="async"><span class="num">09</span>Hand long operations off asynchronously</h2>
+
+      <p>Some operations don't fit in a request/response cycle: video transcodes, bulk imports, report generation, ML inference jobs that take minutes. Holding the HTTP connection open while they run wastes server threads, blows past gateway timeouts (typically 30–60 seconds), and gives the client no way to recover if the connection drops mid-flight. The pattern that solves all three problems at once is the <a class="glink" href="../glossary.html#async-202">async <code>202</code> handoff</a>.</p>
+
+      <h3>The handshake — accept now, do later, expose progress</h3>
+
+      <p>Three steps, three response codes:</p>
+
+      <ol>
+        <li><strong>Client kicks off the work</strong> with a normal <code>POST</code>. The server validates the request, enqueues the job (or starts a background worker), and returns immediately:
+          <div class="codeblock"><code>POST /reports HTTP/1.1
+Content-Type: application/json
+
+{"format": "csv", "range": "2026-Q1", ...}
+
+→ HTTP/1.1 202 Accepted
+  Location: /jobs/abc-123
+  Retry-After: 30
+
+  {"job_id": "abc-123", "status": "queued"}</code></div>
+          The <code>202</code> means "I've taken responsibility for this; check back later." The <code>Location</code> header points at the status endpoint. <code>Retry-After</code> hints at how long to wait before polling.
+        </li>
+        <li><strong>Client polls the status endpoint</strong> until the job finishes:
+          <div class="codeblock"><code>GET /jobs/abc-123
+
+→ HTTP/1.1 200 OK
+  {"job_id": "abc-123", "status": "running", "progress": 0.42}</code></div>
+          Status values are usually <code>queued</code>, <code>running</code>, <code>succeeded</code>, <code>failed</code>, <code>cancelled</code>. Optional <code>progress</code>, <code>started_at</code>, <code>estimated_completion</code> fields if the work is long enough to warrant a progress bar.
+        </li>
+        <li><strong>On completion</strong>, the status endpoint redirects to the resulting resource — for create operations, the conventional response is <code>303 See Other</code>:
+          <div class="codeblock"><code>GET /jobs/abc-123
+
+→ HTTP/1.1 303 See Other
+  Location: /reports/r-789
+
+# Client follows:
+GET /reports/r-789
+→ HTTP/1.1 200 OK
+  {report payload}</code></div>
+          <code>303</code> specifically means "the result is somewhere else, fetch it with <code>GET</code>" — separate from <code>301</code> (permanent move) and <code>302</code> (generic redirect). Use it when an async operation creates a resource and you want to point clients at it.
+        </li>
+      </ol>
+
+      <h3>Webhooks as the push complement to polling</h3>
+
+      <p>Polling is fine for jobs measured in seconds; for jobs measured in minutes or hours, let the client register a webhook URL on the original <code>POST</code>. When the job finishes, the server fires a <code>POST</code> at the webhook URL with the result reference. Polling stays available as a fallback so clients without inbound webhook endpoints (mobile, CLI tools) aren't locked out — and so the client can recover state after a crash without waiting for the next webhook.</p>
+
+      <div class="callout">
+        <div class="callout-label">Why this beats "just hold the connection open"</div>
+        A 30-second LB timeout is the floor — most production gateways are tighter. A 5-minute job over a held connection breaks at every layer (browser, CDN, gateway, load balancer, and the user's own laptop closing the lid). The <code>202</code> + status pattern survives all of that: the client can crash, reconnect, refresh the page, switch networks — and pick up where it left off as long as it remembers the job ID. It's the same idempotency lesson from §02, applied to time instead of retries.
+      </div>
+
+      <h2 id="range"><span class="num">10</span>Support range requests for large resources</h2>
+
+      <p>When a single resource is genuinely large — a video file, a 4K image, a multi-gigabyte export — the right pattern isn't pagination (that's for <em>collections</em>). It's <a class="glink" href="../glossary.html#range-request">HTTP range requests</a>: the client asks for byte offsets, the server hands back the slice they asked for, and the response is treated as part of a stream the client is assembling.</p>
+
+      <h3>How it works</h3>
+
+      <p>The server advertises range support on the regular <code>GET</code> response:</p>
+
+      <div class="codeblock"><code>GET /videos/keynote.mp4
+→ HTTP/1.1 200 OK
+  Accept-Ranges: bytes
+  Content-Length: 524288000   # ~500 MB</code></div>
+
+      <p>Once the client knows ranges are supported, it asks for slices with a <code>Range</code> header:</p>
+
+      <div class="codeblock"><code>GET /videos/keynote.mp4
+Range: bytes=0-1048575       # first 1 MiB
+
+→ HTTP/1.1 206 Partial Content
+  Content-Range: bytes 0-1048575/524288000
+  Content-Length: 1048576
+  &lt;the first 1 MiB of bytes&gt;</code></div>
+
+      <p>The status code is <strong><code>206 Partial Content</code></strong>, distinct from <code>200</code> — it tells the client "this isn't the whole resource, I'm honouring the range you asked for." The <code>Content-Range</code> header echoes what was returned plus the total size, so the client knows when it's seen the last byte.</p>
+
+      <h3>HEAD to probe before downloading</h3>
+
+      <p>A <code>HEAD</code> request returns the same headers as <code>GET</code> but no body — which is exactly what a download manager wants when it's deciding how to chunk a file:</p>
+
+      <div class="codeblock"><code>HEAD /videos/keynote.mp4
+→ HTTP/1.1 200 OK
+  Accept-Ranges: bytes
+  Content-Length: 524288000
+  ETag: "abc123"</code></div>
+
+      <p>The client now knows the total size and that ranges are supported, can plan its download (e.g. four parallel 125 MB ranges), and uses the <code>ETag</code> to detect if the file changes mid-download.</p>
+
+      <div class="callout">
+        <div class="callout-label">What ranges buy you</div>
+        <strong>Resumable downloads</strong> — a connection drop at byte 200 MB out of 500 MB doesn't restart from zero; the client resumes with <code>Range: bytes=209715200-</code>. <strong>Parallel chunking</strong> — multiple ranges fetched concurrently can saturate bandwidth that a single connection couldn't. <strong>Streaming media</strong> — video players seek by asking for the byte range that maps to the timestamp the user clicked. None of this is exotic; every CDN supports it. The cost of <em>not</em> supporting ranges is making your large-file endpoint hostile to mobile networks and unusable for streaming.
+      </div>
+
+      <h2 id="openapi"><span class="num">11</span>Document with OpenAPI</h2>
+
+      <p>An API a client can't read is an API a client guesses at. Word-of-mouth integration (Slack threads, internal wikis, "ask the team that wrote it") is the most expensive form of documentation in existence; <strong><a class="glink" href="../glossary.html#openapi">OpenAPI</a></strong> (formerly Swagger) is the cheapest. It's a YAML or JSON file describing every endpoint — paths, methods, parameters, request and response schemas, error envelopes, auth requirements — that an entire ecosystem of tools knows how to consume.</p>
+
+      <h3>What you write once, you get many things back</h3>
+
+      <ul>
+        <li><strong>Interactive docs</strong> — Swagger UI, Redoc, Stoplight, Scalar all render an OpenAPI spec into a browsable, "try it now" doc site. Onboarding a new client becomes "here's the URL," not "here's a tarball of PDFs."</li>
+        <li><strong>Generated client SDKs</strong> — <code>openapi-generator</code>, Stripe's own toolchain, and most modern API gateways will spit out type-safe clients in TypeScript, Python, Go, Java, Swift, and Kotlin from the same spec. Client teams stop writing HTTP plumbing.</li>
+        <li><strong>Server-side validation</strong> — middleware (express-openapi-validator, FastAPI's Pydantic models, Spring's springdoc) can check incoming requests against the spec at runtime. The schema becomes enforcement, not just documentation — closing the gap the <a class="glink" href="api-design.html#issues">REST critique</a> opens up.</li>
+        <li><strong>Mock servers</strong> — Prism, Stoplight, Postman can stand up a fake server straight from the spec so the frontend can build against the contract before the backend ships a single line.</li>
+        <li><strong>Contract tests in CI</strong> — fail the build the moment a code change diverges from the spec the docs site advertises.</li>
+      </ul>
+
+      <h3>What to put in the spec</h3>
+
+      <p>The minimum useful surface:</p>
+
+      <ul>
+        <li>Every endpoint's path, method, summary, and description.</li>
+        <li>Path / query / header parameters, with type, example, and required-or-not.</li>
+        <li>Request body schema (referenced from a shared <code>components/schemas</code> block — define <code>User</code> once, reuse everywhere).</li>
+        <li>Every response status code your endpoint can return, each with its own schema (success bodies <em>and</em> the <a class="glink" href="../glossary.html#problem-details">Problem Details</a> error envelope from §06).</li>
+        <li>Auth requirements per endpoint (which scopes a token needs).</li>
+        <li>Examples — concrete request/response samples for every important shape. Examples are what readers learn from, not schemas.</li>
+      </ul>
+
+      <div class="callout">
+        <div class="callout-label">Spec-first vs code-first — and why it matters</div>
+        Two ways to keep the spec and the implementation in sync. <strong>Spec-first</strong> writes the YAML by hand, then generates server stubs and clients from it; the spec is the source of truth and the code follows. <strong>Code-first</strong> writes the implementation with annotations (FastAPI, NestJS, Spring) and generates the spec from the code; the code is the source of truth and the spec follows. Either works. What doesn't work is a hand-maintained spec next to a hand-written server — they will drift, and the docs site will lie. Pick one source of truth and let tooling derive the other.
+      </div>
+
+      <h2 id="ratelimit"><span class="num">+1</span>Bonus — Plan for rate limiting</h2>
+
+      <p>Rate limiting is the tip teams ship after the first abusive client lights up the database. By then, the customer-facing endpoint is on fire and there's no clean place to add the gate without breaking integrations. Plan for it before you need it; the cost while no one's abusing you is approximately zero.</p>
+
+      <p>Two purposes worth separating:</p>
+
+      <ul>
+        <li><strong>Fairness</strong> — one tenant or one API key can't starve everyone else. The cap is per-identity (user, key, IP), not global.</li>
+        <li><strong>Defense</strong> — cap the cost of abuse, scraping, and DoS. The cap kicks in before the request hits anything expensive.</li>
+      </ul>
+
+      <p>Both belong at the <a class="glink" href="../distribution/api-gateway-pipeline.html#gates">API gateway</a>, which sees every request before it touches a backend. Common algorithms — <a class="glink" href="../glossary.html#token-bucket">token bucket</a>, <a class="glink" href="../glossary.html#leaky-bucket">leaky bucket</a>, sliding window — all answer the same question (allow or deny) with different memory and burst characteristics.</p>
+
+      <h3>Communicate limits in the response</h3>
+
+      <p>Rate limits are part of the contract; clients can't respect them if they can't see them. Standard headers:</p>
+
+      <div class="codeblock"><code>HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 487
+X-RateLimit-Reset: 1730000000
+
+# When the limit is exceeded:
+HTTP/1.1 429 Too Many Requests
+Retry-After: 60</code></div>
+
+      <p>The <a class="glink" href="../glossary.html#retry-after"><code>Retry-After</code></a> header on a 429 response is the single best protocol-level rate-limit primitive that exists. Well-behaved clients stop retrying until the server invites them back; servers actively shape their own incoming load. Use it.</p>
+
+      <div class="callout">
+        <div class="callout-label">Limit by what?</div>
+        Per-key, per-user, per-IP, or per-endpoint? The right answer is usually <em>several at once</em> — a generous overall key budget, a tighter per-endpoint cap on expensive operations (search, exports), and an IP-based cap as a backstop against unauthenticated abuse. GraphQL adds a wrinkle: you have to limit by query <em>complexity</em>, not request count, because one query can cost as much as a thousand REST calls.
+      </div>
+
+      <div class="callout">
+        <div class="callout-label">One more habit — split the API and the docs onto sibling subdomains</div>
+        Public APIs converge on a stable layout: <code>api.example.com</code> serves the actual traffic; <code>developer.example.com</code> (or <code>developers.example.com</code>) hosts the docs portal, sandbox, and key-management UI. Keep them on different subdomains so they can scale, cache, and harden independently. Add web redirects for the obvious typos: a browser hitting <code>api.example.com</code> with no path should land on the developer portal; <code>dev.example.com</code> and <code>developers.example.com</code> should both resolve to the canonical <code>developer.example.com</code>. None of this is load-bearing on day one, but it's the layout you'll wish you'd picked when the second client integrates.
+      </div>
+
+      <h2 id="takeaway"><span class="num">∞</span>The one-line takeaway</h2>
+
+      <p class="pullquote">A good API is one a client can read once and trust — naming that doesn't surprise, idempotency that survives retries, versioning that doesn't break v1, pagination that doesn't fall off the cliff, query strings that filter cleanly, responses and errors with the same shape on every endpoint, security that isn't bolted on, references that don't lock you into yesterday's hierarchy, async patterns that survive long jobs, range requests that survive long files, and an OpenAPI spec that keeps the docs honest.</p>
+
+      <p>None of these tips are exotic. Each one is roughly five extra minutes at design time, paid back the first time a client integrates without filing a ticket, the first time a retry storm doesn't double-charge a customer, the first time a v2 ships without breaking v1. Treat them as the cheapest insurance you'll ever buy on a piece of code that will live longer than the team that wrote it.</p>
+
+      <div class="terms-block">
+        <div class="terms-block-label">Terms used here</div>
+        <div class="terms-block-links">
+          <a href="../glossary.html#rest">REST</a><a href="../glossary.html#http-method">HTTP method</a><a href="../glossary.html#idempotency">idempotency</a><a href="../glossary.html#idempotency-key">idempotency key</a><a href="../glossary.html#api-versioning">API versioning</a><a href="../glossary.html#offset-pagination">offset pagination</a><a href="../glossary.html#cursor-pagination">cursor pagination</a><a href="../glossary.html#content-negotiation">content negotiation</a><a href="../glossary.html#problem-details">Problem Details</a><a href="../glossary.html#oauth2">OAuth 2.0</a><a href="../glossary.html#rate-limiting">rate limiting</a><a href="../glossary.html#retry-after">Retry-After</a><a href="../glossary.html#token-bucket">token bucket</a><a href="../glossary.html#leaky-bucket">leaky bucket</a><a href="../glossary.html#tls">TLS</a><a href="../glossary.html#api-gateway">API gateway</a><a href="../glossary.html#async-202">async 202</a><a href="../glossary.html#range-request">range request</a><a href="../glossary.html#openapi">OpenAPI</a>
+        </div>
+      </div>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="api-design.html">
+              <span class="related-arrow">→</span>
+              <span>API Design</span>
+              <span class="related-summary">— the styles, verbs, and idempotency mechanics these tips sit on top of.</span>
+            </a>
+          </li>
+          <li>
+            <a href="pagination.html">
+              <span class="related-arrow">→</span>
+              <span>Pagination</span>
+              <span class="related-summary">— offset's two failure modes and the cursor that fixes both.</span>
+            </a>
+          </li>
+          <li>
+            <a href="https-handshake.html">
+              <span class="related-arrow">→</span>
+              <span>HTTPS &amp; The TLS Handshake</span>
+              <span class="related-summary">— the encryption that makes "TLS everywhere" a real promise.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../distribution/api-gateway-pipeline.html">
+              <span class="related-arrow">→</span>
+              <span>The API Gateway Pipeline</span>
+              <span class="related-summary">— where auth, rate limiting, and TLS termination actually run.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../reliability/resilience-patterns.html">
+              <span class="related-arrow">→</span>
+              <span>Resilience Patterns</span>
+              <span class="related-summary">— retries, breakers, throttles. All of them assume the idempotency this page argues for.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 05 · Interfaces. <a href="index.html" style="color: var(--accent)">Back to theme →</a>
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>

@@ -21,6 +21,7 @@
           <a href="classes.html">Classes</a>
           <a href="case-studies/index.html">Case Studies</a>
           <a href="glossary.html" class="active">Glossary</a>
+          <a href="resources.html">Resources</a>
         </div>
         <div class="site-search">
           <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
@@ -44,8 +45,8 @@
       <nav class="glossary-jumpbar" aria-label="Jump to letter">
         <a href="#a">A</a><a href="#b">B</a><a href="#c">C</a><a href="#d">D</a><a href="#e">E</a><a href="#f">F</a>
         <a href="#g">G</a><a href="#h">H</a><a href="#i">I</a><a href="#j">J</a><a href="#k">K</a><a href="#l">L</a>
-        <a href="#m">M</a><a href="#n">N</a><a href="#o" class="empty">O</a><a href="#p">P</a><a href="#q">Q</a><a href="#r">R</a>
-        <a href="#s">S</a><a href="#t">T</a><a href="#u" class="empty">U</a><a href="#v">V</a><a href="#w">W</a><a href="#x" class="empty">X</a>
+        <a href="#m">M</a><a href="#n">N</a><a href="#o">O</a><a href="#p">P</a><a href="#q">Q</a><a href="#r">R</a>
+        <a href="#s">S</a><a href="#t">T</a><a href="#u">U</a><a href="#v">V</a><a href="#w">W</a><a href="#x" class="empty">X</a>
         <a href="#y" class="empty">Y</a><a href="#z">Z</a>
       </nav>
 
@@ -73,13 +74,31 @@
         <div class="glossary-entry" id="api-gateway">
           <div class="glossary-entry-term">API gateway</div>
           <div class="glossary-entry-def">A single public endpoint that fronts many backend services and centralises cross-cutting concerns: authentication, rate limiting, routing, observability, API versioning. Backends sit behind it as plain services. Common implementations: Kong, AWS API Gateway, Apigee, Envoy, Tyk.</div>
-          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#gateway">The API Gateway Pipeline</a></div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#gateway">The API Gateway Pipeline</a><a href="interfaces/api-best-practices.html#security">API Design Best Practices</a></div>
+        </div>
+
+        <div class="glossary-entry" id="api-versioning">
+          <div class="glossary-entry-term">API versioning</div>
+          <div class="glossary-entry-def">Strategy for evolving an API without breaking integrated clients. Three common shapes: <em>URL versioning</em> (<code>/v1/users</code>) — explicit and easy to debug, but the segment lives in every URL forever; <em>header versioning</em> (<code>API-Version: 2</code> or <code>Accept: application/vnd.acme.v2+json</code>) — clean URLs but invisible from <code>curl</code>; <em>date-based versioning</em> (Stripe's <code>Stripe-Version: 2024-04-01</code>) — header-style with calendar semantics. Pair with the <code>Deprecation</code> and <code>Sunset</code> response headers so clients know a cutover is coming before it lands.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#versioning">API Design Best Practices</a></div>
         </div>
 
         <div class="glossary-entry" id="apex">
           <div class="glossary-entry-term">apex <span class="glossary-entry-aliases">root domain · naked domain · zone apex</span></div>
           <div class="glossary-entry-def">The zone name itself — <code>example.com</code>, not <code>www.example.com</code>. The apex must carry mandatory <code>SOA</code> and <code>NS</code> records, which is why you can't put a CNAME there: CNAME refuses to coexist with any other record.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html#cname-rules">DNS Resolution</a></div>
+        </div>
+
+        <div class="glossary-entry" id="asymmetric-crypto">
+          <div class="glossary-entry-term">asymmetric crypto <span class="glossary-entry-aliases">public-key cryptography</span></div>
+          <div class="glossary-entry-def">Cryptographic schemes where each party has two mathematically linked keys: a <em>public</em> one given out freely and a <em>private</em> one kept secret. Encrypt with public, decrypt with private; sign with private, verify with public. Slow compared to symmetric ciphers (AES), so used sparingly — typically just to bootstrap a shared secret.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#building-blocks">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
+
+        <div class="glossary-entry" id="async-202">
+          <div class="glossary-entry-term">async 202 handoff <span class="glossary-entry-aliases">long-running operation pattern</span></div>
+          <div class="glossary-entry-def">The pattern for operations that can't fit in one request/response cycle: server accepts the work and returns <code>202 Accepted</code> immediately with a <code>Location</code> header pointing at a status endpoint. Client polls the status endpoint (or registers a webhook) until the job finishes. On completion, the status endpoint redirects to the result with <code>303 See Other</code>. Survives gateway timeouts, dropped connections, and client crashes — the job ID is the resumable handle.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#async">API Design Best Practices</a></div>
         </div>
 
         <div class="glossary-entry" id="authoritative-dns">
@@ -162,6 +181,18 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
         </div>
 
+        <div class="glossary-entry" id="certificate">
+          <div class="glossary-entry-term">certificate <span class="glossary-entry-aliases">SSL cert · TLS cert · X.509</span></div>
+          <div class="glossary-entry-def">A signed document binding a public key to an identity (a domain name, typically). Issued by a Certificate Authority and verified by clients against a trust store of known CAs. The browser shipping ~150 root CAs is what makes "<code>https://bank.com</code>" actually identify <em>bank.com</em>.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#building-blocks">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
+
+        <div class="glossary-entry" id="certificate-authority">
+          <div class="glossary-entry-term">Certificate Authority <span class="glossary-entry-aliases">CA</span></div>
+          <div class="glossary-entry-def">An entity that issues and signs certificates. Browsers and operating systems ship with a hardcoded list of root CAs they trust (Let's Encrypt, DigiCert, GlobalSign, etc.); a cert signed by one of these is automatically accepted, while a self-signed cert is not. The trust store is the root of the chain.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#building-blocks">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
+
         <div class="glossary-entry" id="cname">
           <div class="glossary-entry-term">CNAME <span class="glossary-entry-aliases">canonical name</span></div>
           <div class="glossary-entry-def">A DNS record that aliases one name to another. Resolvers follow the chain (CNAME → CNAME → … → A) until they reach a terminal record. Two rules: a name with a CNAME can have <em>no other records</em>, and the apex can't be a CNAME (because <code>SOA</code> and <code>NS</code> are required there).</div>
@@ -180,10 +211,22 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#caches">Memory Hierarchy</a></div>
         </div>
 
+        <div class="glossary-entry" id="content-negotiation">
+          <div class="glossary-entry-term">content negotiation</div>
+          <div class="glossary-entry-def">The HTTP mechanism by which a client and server agree on the response representation. The client sends an <code>Accept</code> header listing acceptable media types (e.g., <code>application/json</code>, <code>application/xml</code>); the server picks the best match it supports and returns it, or responds with <code>406 Not Acceptable</code>. Most APIs default to JSON when no preference is given.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#responses">API Design Best Practices</a></div>
+        </div>
+
         <div class="glossary-entry" id="consensus">
           <div class="glossary-entry-term">consensus</div>
           <div class="glossary-entry-def">A class of distributed algorithms (Paxos, Raft, Zab) where a majority of nodes must agree before a value is committed. The basis of CP systems — minority partitions can't make progress.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#cp">CAP Theorem</a></div>
+        </div>
+
+        <div class="glossary-entry" id="cors">
+          <div class="glossary-entry-term">CORS <span class="glossary-entry-aliases">Cross-Origin Resource Sharing</span></div>
+          <div class="glossary-entry-def">The browser protocol that relaxes the same-origin policy so JavaScript on one origin can call an API on another. Simple requests (<code>GET</code>/<code>HEAD</code>/form-encoded <code>POST</code>) carry an <code>Origin</code> header and the server replies with <code>Access-Control-Allow-Origin</code>; non-simple requests (custom headers, <code>PUT</code>/<code>DELETE</code>/<code>PATCH</code>, JSON bodies) trigger an <code>OPTIONS</code> <em>preflight</em> first. Caching the preflight via <code>Access-Control-Max-Age</code> turns the two-round-trip cost back into one.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#verbs">API Design</a></div>
         </div>
 
         <div class="glossary-entry" id="cow">
@@ -197,6 +240,12 @@
           <div class="glossary-entry-def">A per-thread bit-mask that restricts which cores the kernel scheduler can run that thread on. Pinning narrows the mask — sometimes to a single core — to keep cache state warm and avoid migration.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/core-pinning.html">Core Pinning</a></div>
         </div>
+
+        <div class="glossary-entry" id="cursor-pagination">
+          <div class="glossary-entry-term">cursor pagination <span class="glossary-entry-aliases">keyset pagination · seek pagination</span></div>
+          <div class="glossary-entry-def">A pagination scheme where each response includes an opaque <em>cursor</em> — typically the sort key of the last row — that the client passes back to fetch the next page. The query becomes "rows after this cursor" rather than "skip N rows", which is <code>O(log N)</code> per page and stable under concurrent writes. Trade-off: no random-access "page 50".</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/pagination.html#cursor">Pagination</a><a href="interfaces/api-best-practices.html#pagination">API Design Best Practices</a></div>
+        </div>
       </section>
 
       <section id="d" class="glossary-letter">
@@ -206,6 +255,12 @@
           <div class="glossary-entry-term">DDR5</div>
           <div class="glossary-entry-def">The current generation of DRAM signalling standard. Roughly 100 GB/s of bandwidth per channel on modern server DIMMs, ~80 ns access latency.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#tiers">Memory Hierarchy</a></div>
+        </div>
+
+        <div class="glossary-entry" id="diffie-hellman">
+          <div class="glossary-entry-term">Diffie-Hellman <span class="glossary-entry-aliases">DH · DHE · ECDHE</span></div>
+          <div class="glossary-entry-def">A key-exchange protocol that lets two parties on a hostile network derive the same shared secret without ever sending it. Each side picks a private value, exchanges a public derivation, and combines them to land on <code>g<sup>ab</sup> mod p</code>. An eavesdropper sees both public values but recovering <code>a</code> or <code>b</code> is the discrete log problem — infeasible at large <code>p</code>.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#dh">HTTPS &amp; The TLS Handshake</a></div>
         </div>
 
         <div class="glossary-entry" id="dig">
@@ -220,6 +275,12 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/dns-resolution.html">DNS Resolution</a><a href="distribution/dns-ttl-and-change.html">DNS TTL &amp; Cutovers</a></div>
         </div>
 
+        <div class="glossary-entry" id="discrete-log">
+          <div class="glossary-entry-term">discrete logarithm problem <span class="glossary-entry-aliases">DLP</span></div>
+          <div class="glossary-entry-def">Given <code>g</code>, <code>p</code>, and <code>y = g<sup>x</sup> mod p</code>, find <code>x</code>. Computing <code>g<sup>x</sup> mod p</code> is fast; reversing it is infeasible at large <code>p</code>. That asymmetry is the foundation of Diffie-Hellman key exchange and several digital-signature schemes.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#dh">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
+
         <div class="glossary-entry" id="dram">
           <div class="glossary-entry-term">DRAM <span class="glossary-entry-aliases">dynamic RAM</span></div>
           <div class="glossary-entry-def">The main-memory tier. One transistor + one capacitor per bit; cheap and dense, but has to be periodically refreshed and lives off-chip from the CPU. ~80 ns access latency.</div>
@@ -229,6 +290,12 @@
 
       <section id="e" class="glossary-letter">
         <div class="glossary-letter-heading">E</div>
+
+        <div class="glossary-entry" id="ecdhe">
+          <div class="glossary-entry-term">ECDHE <span class="glossary-entry-aliases">elliptic-curve Diffie-Hellman ephemeral</span></div>
+          <div class="glossary-entry-def">Diffie-Hellman over an elliptic-curve group instead of integers mod a prime. Same protocol structure, but equivalent security at smaller key sizes (256 bits ≈ 3072-bit RSA) and faster operations. The "ephemeral" half means a fresh keypair is generated for each session and discarded — the basis for forward secrecy.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#dh">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
 
         <div class="glossary-entry" id="eventual-consistency">
           <div class="glossary-entry-term">eventual consistency</div>
@@ -250,6 +317,12 @@
           <div class="glossary-entry-term">forward proxy</div>
           <div class="glossary-entry-def">A proxy that sits in front of <em>clients</em> and represents them to destination servers — the mirror image of a reverse proxy. Common uses: corporate egress filtering, outbound caching, audit/DLP logging, anonymity / IP masking (Tor, VPN), and geo-routing. Mnemonic: forward proxy hides the client; reverse proxy hides the server.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#forward-proxy">The API Gateway Pipeline</a></div>
+        </div>
+
+        <div class="glossary-entry" id="forward-secrecy">
+          <div class="glossary-entry-term">forward secrecy <span class="glossary-entry-aliases">perfect forward secrecy · PFS</span></div>
+          <div class="glossary-entry-def">A property of a key-exchange protocol: even if a long-term secret leaks tomorrow, traffic recorded today stays unreadable. Achieved by deriving each session's encryption key from <em>ephemeral</em> values that are discarded when the session ends. TLS 1.3 mandates it; old RSA key exchange (TLS 1.2 and earlier) didn't have it.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#naive">HTTPS &amp; The TLS Handshake</a></div>
         </div>
 
         <div class="glossary-entry" id="fsync">
@@ -286,10 +359,22 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#graceful">Resilience Patterns</a></div>
         </div>
 
+        <div class="glossary-entry" id="graphql">
+          <div class="glossary-entry-term">GraphQL</div>
+          <div class="glossary-entry-def">A query language for APIs. The client sends a query naming exactly the fields it wants; the server responds with a matching shape. Solves over-fetching and N+1 round-trips at the cost of URL-based caching, by-count rate-limiting, and resolver-side N+1 query problems (mitigated by DataLoader). Best fit: BFF layers aggregating many backends for one UI.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
+        </div>
+
         <div class="glossary-entry" id="green-thread">
           <div class="glossary-entry-term">green thread <span class="glossary-entry-aliases">goroutine · virtual thread · fiber</span></div>
           <div class="glossary-entry-def">A user-space thread scheduled by a language runtime onto a small pool of OS threads. Switch cost is hundreds of nanoseconds instead of microseconds. Examples: Go goroutines, Java virtual threads, async Rust tasks, Erlang processes.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/process-vs-thread.html#cost">Process vs Thread</a><a href="execution/context-switching.html#fix">Context Switching</a></div>
+        </div>
+
+        <div class="glossary-entry" id="grpc">
+          <div class="glossary-entry-term">gRPC</div>
+          <div class="glossary-entry-def">Google's modern RPC framework — <code>.proto</code> schemas (Protocol Buffers), HTTP/2 transport, generated client/server stubs in many languages, and built-in support for unary, server-streaming, client-streaming, and bidirectional-streaming calls. Best fit: internal service-to-service where you control both ends and want speed plus typed contracts.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
         </div>
       </section>
 
@@ -300,6 +385,12 @@
           <div class="glossary-entry-term">hash ring</div>
           <div class="glossary-entry-def">A circular keyspace (typically 0 to 2<sup>32</sup>−1) where both servers and keys are placed by hash. To find a key's owner, walk clockwise from the key's position until you bump into a server.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/consistent-hashing.html#ring">Consistent Hashing</a></div>
+        </div>
+
+        <div class="glossary-entry" id="hateoas">
+          <div class="glossary-entry-term">HATEOAS <span class="glossary-entry-aliases">Hypermedia as the Engine of Application State</span></div>
+          <div class="glossary-entry-def">The REST property where each response embeds hyperlinks to the actions a client can take next, so the client navigates by following links instead of hard-coding URL templates. Roy Fielding's original dissertation argues this is what separates REST from "JSON over HTTP"; in practice most public APIs ship URI templates in their docs and skip it. Variants that lean into it: HAL, JSON:API, Siren.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
         </div>
 
         <div class="glossary-entry" id="hbm">
@@ -319,15 +410,27 @@
           <div class="glossary-entry-def">Apple's video-streaming protocol where a stream is broken into small (~2–10 second) MP4 chunks and a manifest lists them. Each chunk is fetched as a normal HTTP request, which lets streams flow through any HTTP CDN.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/hardware-pressure.html#profiles">Hardware Pressure</a></div>
         </div>
+
+        <div class="glossary-entry" id="http-method">
+          <div class="glossary-entry-term">HTTP method <span class="glossary-entry-aliases">HTTP verb</span></div>
+          <div class="glossary-entry-def">The action component of an HTTP request: <code>GET</code> reads, <code>POST</code> creates, <code>PUT</code> replaces, <code>PATCH</code> partially updates, <code>DELETE</code> removes. <code>HEAD</code> and <code>OPTIONS</code> are auxiliary. Each verb has an idempotency and safety property baked into the spec — worth memorising because retries and caching depend on them.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#verbs">API Design</a><a href="interfaces/api-best-practices.html#idempotency">API Design Best Practices</a></div>
+        </div>
       </section>
 
       <section id="i" class="glossary-letter">
         <div class="glossary-letter-heading">I</div>
 
         <div class="glossary-entry" id="idempotency">
-          <div class="glossary-entry-term">idempotency</div>
+          <div class="glossary-entry-term">idempotency <span class="glossary-entry-aliases">idempotent</span></div>
           <div class="glossary-entry-def">A property where running the same operation twice has the same effect as running it once. Reads are naturally idempotent; mutations need an explicit idempotency key (a UUID the client generates and the server dedupes by). Precondition for safe retries.</div>
-          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#setting">Resilience Patterns</a></div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#setting">Resilience Patterns</a><a href="interfaces/api-design.html#verbs">API Design</a><a href="interfaces/api-best-practices.html#idempotency">API Design Best Practices</a></div>
+        </div>
+
+        <div class="glossary-entry" id="idempotency-key">
+          <div class="glossary-entry-term">idempotency key</div>
+          <div class="glossary-entry-def">A client-generated unique token (typically a UUID) sent on a mutation request. The server stores the response keyed by it and returns the cached response on retry, so the same logical request can be sent ten times and execute exactly once. Stripe popularised it; standard for payment APIs. Pair with a TTL longer than the client's retry budget.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#idempotency">API Design</a><a href="interfaces/api-best-practices.html#idempotency">API Design Best Practices</a></div>
         </div>
 
         <div class="glossary-entry" id="iops">
@@ -429,6 +532,12 @@
           <div class="glossary-entry-def">A higher-priority task queued by <code>Promise.then</code>, <code>queueMicrotask</code>, or <code>MutationObserver</code>. Microtasks drain entirely between every macrotask — <code>Promise.then</code> always runs before the next <code>setTimeout</code>.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/event-loop.html#micro">The Event Loop</a></div>
         </div>
+
+        <div class="glossary-entry" id="mtls">
+          <div class="glossary-entry-term">mTLS <span class="glossary-entry-aliases">mutual TLS · client-authenticated TLS</span></div>
+          <div class="glossary-entry-def">A TLS variant where both sides — not just the server — present certificates. The server verifies the client's cert against its own trust store. Used inside zero-trust infrastructure and B2B APIs, but not on the public web (browsers don't have certs).</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#building-blocks">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
       </section>
 
       <section id="n" class="glossary-letter">
@@ -450,6 +559,34 @@
           <div class="glossary-entry-term">NUMA <span class="glossary-entry-aliases">Non-Uniform Memory Access</span></div>
           <div class="glossary-entry-def">A multi-socket architecture where DRAM is split across sockets. Local-socket access is fast (~80 ns); remote-socket access goes over the inter-socket link (~120–160 ns). Pinning keeps thread and memory on the same NUMA node.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="execution/core-pinning.html#numa">Core Pinning</a></div>
+        </div>
+      </section>
+
+      <section id="o" class="glossary-letter">
+        <div class="glossary-letter-heading">O</div>
+
+        <div class="glossary-entry" id="oauth2">
+          <div class="glossary-entry-term">OAuth 2.0 <span class="glossary-entry-aliases">OAuth2 · OIDC</span></div>
+          <div class="glossary-entry-def">The standard authorisation framework for APIs. The client gets an access token from an authorisation server and presents it on each request; the resource server verifies the token's signature, expiry, scope, and audience before honouring the call. Grant types match client shapes: <em>Authorization Code + PKCE</em> (web/mobile), <em>Client Credentials</em> (service-to-service), <em>Device Code</em> (TVs/CLIs). <strong>OpenID Connect (OIDC)</strong> layers identity (the "who") on top of OAuth's authorisation (the "what are you allowed to do").</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#security">API Design Best Practices</a></div>
+        </div>
+
+        <div class="glossary-entry" id="offset-pagination">
+          <div class="glossary-entry-term">offset pagination <span class="glossary-entry-aliases">offset/limit</span></div>
+          <div class="glossary-entry-def">A pagination scheme where the client requests <code>limit=N&amp;offset=K</code> and the server returns rows <code>K+1</code> through <code>K+N</code>. Simple and supports random-access ("page 50 of 200"), but two failure modes: cost grows linearly with offset (deep pages are slow), and the result is inconsistent under concurrent writes (rows duplicate or skip).</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/pagination.html#offset">Pagination</a><a href="interfaces/api-best-practices.html#pagination">API Design Best Practices</a></div>
+        </div>
+
+        <div class="glossary-entry" id="openapi">
+          <div class="glossary-entry-term">OpenAPI <span class="glossary-entry-aliases">Swagger</span></div>
+          <div class="glossary-entry-def">A YAML or JSON specification format describing every endpoint of an HTTP API — paths, methods, parameters, request and response schemas, error envelopes, auth requirements. One spec drives an ecosystem: interactive docs (Swagger UI, Redoc), generated client SDKs, server-side request validation, mock servers, contract tests. Two authoring styles: <em>spec-first</em> (write YAML, generate stubs) or <em>code-first</em> (annotate the implementation, generate spec). Either works as long as one is the source of truth.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#openapi">API Design Best Practices</a><a href="interfaces/api-design.html#issues">API Design</a></div>
+        </div>
+
+        <div class="glossary-entry" id="over-fetching">
+          <div class="glossary-entry-term">over-fetching</div>
+          <div class="glossary-entry-def">An API returning more fields than the client needs. Common in REST when one endpoint serves many call sites with different needs. Wastes bandwidth and parse time, especially on mobile. GraphQL solves it by letting the client name the fields it wants.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
         </div>
       </section>
 
@@ -509,6 +646,18 @@
           <div class="glossary-entry-def">CPU hardware that watches access patterns and pulls in cache lines <em>before</em> the program asks for them. Sequential access is its happy path; random access defeats it entirely.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/cache-locality.html#locality">Cache Locality</a></div>
         </div>
+
+        <div class="glossary-entry" id="problem-details">
+          <div class="glossary-entry-term">Problem Details <span class="glossary-entry-aliases">RFC 7807 · application/problem+json</span></div>
+          <div class="glossary-entry-def">A standard JSON shape for HTTP error responses defined by RFC 7807. Returns a media type of <code>application/problem+json</code> and a body with <code>type</code>, <code>title</code>, <code>status</code>, <code>detail</code>, and <code>instance</code> fields, plus any extensions (<code>code</code>, <code>hint</code>, <code>trace_id</code>). Lets clients write one error-handling code path against every endpoint instead of one per service.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#responses">API Design Best Practices</a></div>
+        </div>
+
+        <div class="glossary-entry" id="protobuf">
+          <div class="glossary-entry-term">Protobuf <span class="glossary-entry-aliases">Protocol Buffers</span></div>
+          <div class="glossary-entry-def">Google's schema-first IDL for binary message serialisation. You write a <code>.proto</code> file describing messages and services; a compiler generates type-safe stubs in many languages. Wire format is tag-and-varint — ~3× smaller than the equivalent JSON. The serialisation layer underneath gRPC.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
+        </div>
       </section>
 
       <section id="q" class="glossary-letter">
@@ -536,10 +685,16 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#cp">CAP Theorem</a></div>
         </div>
 
+        <div class="glossary-entry" id="range-request">
+          <div class="glossary-entry-term">range request <span class="glossary-entry-aliases">byte range · partial content</span></div>
+          <div class="glossary-entry-def">An HTTP mechanism for fetching a slice of a large resource instead of the whole thing. The server advertises support with <code>Accept-Ranges: bytes</code>; the client asks with a <code>Range: bytes=0-1048575</code> header; the server replies with <code>206 Partial Content</code> and a <code>Content-Range</code> echoing what was returned. Enables resumable downloads, parallel chunked fetches, and video-style seeking. Distinct from pagination, which is for collections; ranges are for single large resources.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-best-practices.html#range">API Design Best Practices</a></div>
+        </div>
+
         <div class="glossary-entry" id="rate-limiting">
           <div class="glossary-entry-term">rate limiting</div>
           <div class="glossary-entry-def">Capping how many requests a given identity (user, API key, IP) can issue per window. Two purposes: fairness (one tenant can't starve others) and defense (cap the cost of abuse or DoS). Lives at the gateway because the gateway sees every request — putting it deeper means costs are paid before the limit kicks in. Common algorithms: token bucket, leaky bucket, fixed-window, sliding-window log.</div>
-          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#gates">The API Gateway Pipeline</a></div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#gates">The API Gateway Pipeline</a><a href="interfaces/api-best-practices.html#ratelimit">API Design Best Practices</a></div>
         </div>
 
         <div class="glossary-entry" id="recursive-resolver">
@@ -552,6 +707,12 @@
           <div class="glossary-entry-term">replication factor <span class="glossary-entry-aliases">RF</span></div>
           <div class="glossary-entry-def">How many copies of each piece of data the cluster keeps — typically 3. Production systems also place those copies on distinct racks or availability zones so that a single rack failure doesn't take all replicas.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/consistent-hashing.html#replication">Consistent Hashing</a></div>
+        </div>
+
+        <div class="glossary-entry" id="rest">
+          <div class="glossary-entry-term">REST <span class="glossary-entry-aliases">Representational State Transfer</span></div>
+          <div class="glossary-entry-def">A resource-oriented API style: URL identifies a resource, HTTP verb describes the action on it. Stateless (each request is self-contained), cacheable via HTTP semantics, text-based (usually JSON), and loosely coupled (URLs are the contract, not generated stubs). Dominant on the public web for the universality and tooling, slower on the wire than binary alternatives.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a><a href="interfaces/api-best-practices.html">API Design Best Practices</a></div>
         </div>
 
         <div class="glossary-entry" id="retry-after">
@@ -578,6 +739,12 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/api-gateway-pipeline.html#proxy">The API Gateway Pipeline</a></div>
         </div>
 
+        <div class="glossary-entry" id="rpc">
+          <div class="glossary-entry-term">RPC <span class="glossary-entry-aliases">remote procedure call</span></div>
+          <div class="glossary-entry-def">A function-oriented API style: the client calls a method on a remote service as if it were local, with the framework hiding the network behind a generated stub. Modern incarnations include gRPC, Thrift, and Cap'n Proto. Faster on the wire than REST and strongly typed; less universal (no browser-native support) and more coupled.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
+        </div>
+
         <div class="glossary-entry" id="rps">
           <div class="glossary-entry-term">RPS · QPS · TPS</div>
           <div class="glossary-entry-def">Requests / queries / transactions per second — the standard throughput units. Pick the one that matches what the system produces; a peak number is what you size capacity against.</div>
@@ -587,6 +754,12 @@
 
       <section id="s" class="glossary-letter">
         <div class="glossary-letter-heading">S</div>
+
+        <div class="glossary-entry" id="safe-method">
+          <div class="glossary-entry-term">safe method <span class="glossary-entry-aliases">safe HTTP method</span></div>
+          <div class="glossary-entry-def">An HTTP method that doesn't change server state. <code>GET</code>, <code>HEAD</code>, and <code>OPTIONS</code> are safe; the others are not. Safe methods can be cached aggressively, prefetched by the browser, and hit speculatively without worrying about side effects.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#verbs">API Design</a></div>
+        </div>
 
         <div class="glossary-entry" id="sched-setaffinity">
           <div class="glossary-entry-term">sched_setaffinity</div>
@@ -630,6 +803,12 @@
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="hardware/memory-hierarchy.html#why">Memory Hierarchy</a></div>
         </div>
 
+        <div class="glossary-entry" id="ssl">
+          <div class="glossary-entry-term">SSL <span class="glossary-entry-aliases">Secure Sockets Layer</span></div>
+          <div class="glossary-entry-def">The deprecated predecessor to TLS, whose name still gets used colloquially ("SSL certificate" usually means "TLS certificate"). The last SSL version (3.0) was deprecated in 2015; modern HTTPS is TLS 1.2 or 1.3. Treat the name as historical and use <em>TLS</em> when precision matters.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#why">HTTPS &amp; The TLS Handshake</a></div>
+        </div>
+
         <div class="glossary-entry" id="stale-while-revalidate">
           <div class="glossary-entry-term">stale-while-revalidate</div>
           <div class="glossary-entry-def">A cache strategy that serves the stale value immediately while a single background task refreshes. No client ever waits for a cold rebuild; the cost of staleness is bounded to one refresh cycle.</div>
@@ -656,6 +835,12 @@
           <div class="glossary-entry-term">throttle</div>
           <div class="glossary-entry-def">A hard cap on incoming rate or concurrency, enforced at the gateway. Past the limit, requests are rejected with <code>429 Too Many Requests</code>. Prevents overload by saying no at the door.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="reliability/resilience-patterns.html#gateway">Resilience Patterns</a></div>
+        </div>
+
+        <div class="glossary-entry" id="tls">
+          <div class="glossary-entry-term">TLS <span class="glossary-entry-aliases">Transport Layer Security</span></div>
+          <div class="glossary-entry-def">The protocol that encrypts HTTP into HTTPS. Provides three guarantees: encryption (only endpoints can read), integrity (tampering is detected via MAC), and authentication (the server proves identity via a certificate). TLS 1.3 (2018) is the modern version — one round-trip handshake, mandatory forward secrecy, retired RSA key exchange.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/https-handshake.html#why">HTTPS &amp; The TLS Handshake</a></div>
         </div>
 
         <div class="glossary-entry" id="tls-termination">
@@ -692,6 +877,16 @@
           <div class="glossary-entry-term">tunable consistency</div>
           <div class="glossary-entry-def">A database feature where the consistency level is set per-query rather than per-cluster. Cassandra's <code>ONE</code> / <code>QUORUM</code> / <code>ALL</code> are the canonical example.</div>
           <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="distribution/cap-theorem.html#ap">CAP Theorem</a></div>
+        </div>
+      </section>
+
+      <section id="u" class="glossary-letter">
+        <div class="glossary-letter-heading">U</div>
+
+        <div class="glossary-entry" id="under-fetching">
+          <div class="glossary-entry-term">under-fetching</div>
+          <div class="glossary-entry-def">An API returning less than the client needs in one response, forcing it to make additional round-trips to gather everything. Common in REST for graph-shaped reads ("user → orders → items" is N+2 calls). Network round-trip latency dominates the user-visible time. GraphQL solves it by collapsing related fetches into one shaped response.</div>
+          <div class="glossary-entry-used"><span style="margin-right: 14px;">Used in:</span><a href="interfaces/api-design.html#styles">API Design</a></div>
         </div>
       </section>
 

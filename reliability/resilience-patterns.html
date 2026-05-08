@@ -21,6 +21,7 @@
           <a href="../classes.html">Classes</a>
           <a href="../case-studies/index.html">Case Studies</a>
           <a href="../glossary.html">Glossary</a>
+          <a href="../resources.html">Resources</a>
         </div>
         <div class="site-search">
           <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
@@ -66,7 +67,7 @@
 
       <div class="callout">
         <div class="callout-label">Idempotency is a precondition, not a pattern</div>
-        Most patterns below assume the operation is <strong><a class="glink" href="../glossary.html#idempotency">idempotent</a></strong> — running it twice has the same effect as running it once. Reads are naturally idempotent; mutations need an explicit idempotency key (a UUID the client generates and the server dedupes by). Without idempotency, retries mean double-charges, duplicate emails, and corrupted state. Establish idempotency at the API boundary before reaching for any of the techniques below.
+        Most patterns below assume the operation is <strong><a class="glink" href="../glossary.html#idempotency">idempotent</a></strong> — running it twice has the same effect as running it once. Reads are naturally idempotent; mutations need an explicit idempotency key (a UUID the client generates and the server dedupes by). Without idempotency, retries mean double-charges, duplicate emails, and corrupted state. Establish idempotency at the API boundary before reaching for any of the techniques below — see <a class="glink" href="../interfaces/api-design.html#idempotency">making <code>POST</code> safe to retry</a> for the two patterns (<code>Idempotency-Key</code> header and natural-key dedup) that get you there.
       </div>
 
       <h2 id="retries"><span class="num">02</span>Retry safely — storm, capping, backoff, jitter, Retry-After</h2>
@@ -318,6 +319,13 @@
       <div class="related-topics">
         <div class="related-label">Related topics</div>
         <ul class="related-list">
+          <li>
+            <a href="../interfaces/api-design.html#idempotency">
+              <span class="related-arrow">→</span>
+              <span>API Design — Idempotency</span>
+              <span class="related-summary">— retries are safe only if the operation is idempotent; here are the two patterns that make it so.</span>
+            </a>
+          </li>
           <li>
             <a href="../performance/latency-throughput.html">
               <span class="related-arrow">→</span>

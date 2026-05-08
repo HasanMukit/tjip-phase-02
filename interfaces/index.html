@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interfaces — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="../case-studies/index.html">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+          <a href="../resources.html">Resources</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <section class="theme-page">
+      <header class="theme-header">
+        <div class="eyebrow">Theme 06 — Interfaces</div>
+        <h1>The <em>contract</em> between client and server.</h1>
+        <p class="deck">
+          API styles (REST, RPC, GraphQL), the HTTP verbs and idempotency rules that make retries safe, the TLS handshake
+          that protects every modern request, and the pagination patterns that keep result sets bounded. The boundary
+          layer where independent systems meet.
+        </p>
+      </header>
+
+      <div class="topic-rows">
+        <a href="api-design.html" class="topic-row">
+          <span class="row-pill">Class 05</span>
+          <div class="row-body">
+            <h3>API Design</h3>
+            <p>Three styles compared (REST, gRPC, GraphQL), the REST verbs and what idempotency means for retries, why JSON's wire-cost is rarely the real bottleneck, and how to make a <code>POST</code> safe to repeat.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="api-best-practices.html" class="topic-row">
+          <span class="row-pill">Class 05</span>
+          <div class="row-body">
+            <h3>API Design Best Practices</h3>
+            <p>Eight habits that separate an API a client wants to keep using from one a client tolerates — naming, idempotency, versioning, pagination, query strings, predictable responses, security, simple references — plus the rate-limiting plan most teams ship too late.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="https-handshake.html" class="topic-row">
+          <span class="row-pill">Class 05</span>
+          <div class="row-body">
+            <h3>HTTPS &amp; The TLS Handshake</h3>
+            <p>What HTTP gets wrong (eavesdropping, tampering, impersonation), how certificates establish identity, and the Diffie-Hellman math that lets two parties on a hostile network agree on a shared secret without ever sending it.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+
+        <a href="pagination.html" class="topic-row">
+          <span class="row-pill">Class 05</span>
+          <div class="row-body">
+            <h3>Pagination</h3>
+            <p>Offset/limit's two failure modes — the deep-page perf cliff and inconsistency under live writes — and how cursor pagination fixes both with an indexed seek and a stable handle.</p>
+          </div>
+          <span class="row-arrow">→</span>
+        </a>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Theme 06 of 07. <a href="../reliability/index.html" style="color: var(--accent)">← Reliability</a> · <a href="../craft/index.html" style="color: var(--accent)">Craft →</a>
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>

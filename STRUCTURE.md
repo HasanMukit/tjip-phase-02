@@ -13,6 +13,7 @@ This file is the operating manual for the site. Read it before adding a new clas
 ├── index.html                    theme-first homepage (primary entry)
 ├── classes.html                  by-class view (secondary entry)
 ├── glossary.html                 alphabetical appendix, A–Z jumpbar
+├── resources.html                standalone YouTube-video index per class (see §2.7)
 │
 ├── hardware/        index.html + topic pages
 ├── execution/       index.html + topic pages
@@ -130,6 +131,26 @@ SVG text uses `.svg-text`, `.svg-text-bold`, `.svg-text-muted`, `.svg-text-small
 
 The mobile breakpoint is `max-width: 640px`. Anything new needs a responsive override there if it doesn't degrade gracefully by default.
 
+### 2.7 `resources.html` — standalone, off the graph
+
+`resources.html` is the curated YouTube-video index per class. It is deliberately **standalone** and isolated from the rest of the content graph:
+
+- **No search index entry.** It must NOT appear in `scripts/build_index.py`'s `ROOT_PAGES` or `THEME_DIRS`. CI rebuilds the index from those lists only — keep it that way so external video links don't pollute search results.
+- **No cross-links from topic, theme, case-study, or glossary pages.** Don't add `glink`s, related-topics rows, or `<a>`s pointing into `resources.html#…` from anywhere. The only inbound link is the **Resources** entry in the top `site-nav-links` (present on every page).
+- **No glossary entries** for terms that only show up here. Glossary scope (§2.3) stays strict — videos are external, not authored content.
+- **Outbound links go off-site only** (YouTube). Every title link uses `target="_blank" rel="noopener noreferrer"`.
+
+Page anatomy:
+1. Standard `site-nav` (with `Resources` marked `class="active"` here).
+2. `<section class="hero">` — same shape as `classes.html`.
+3. `<section class="resource-jump">` — "Jump to class" grid linking to each `#class-NN` anchor.
+4. `<section class="classes-section">` containing one `<div class="resource-class" id="class-NN">` per class. Each holds a `.resource-class-head` (class number + title + summary) and one `.resource-topic` per topic. Each topic has an `<h3 class="resource-topic-title">` and one `.data-table` with three columns: **Title** (URL embedded, opens in new tab), **Channel**, **Duration** (`td.mono`).
+5. Footer.
+
+When a new class lands and ships videos, add a new `<div class="resource-class" id="class-NN">` block here AND a matching `<a href="#class-NN">` in the jump grid. That's it — do not touch search, glossary, or any other page.
+
+If a class is taught but its video list isn't ready yet (or the reverse: videos prepared before class), mark it with `<span class="upcoming-pill">Upcoming</span>` next to the class title and a one-line note in the summary.
+
 ---
 
 ## 3. Adding a new class
@@ -152,9 +173,16 @@ For each topic, decide its theme. Use this matrix:
 | State spread across machines (placement, consistency) | `distribution/` |
 | Latency / throughput / capacity vocabulary | `performance/` |
 | Failure-mode patterns (retry, breaker, throttle) | `reliability/` |
+| Contracts at system boundaries (API design, HTTPS, pagination) | `interfaces/` |
 | Process / interview / estimation skills | `craft/` |
 
-If a topic doesn't fit, **ask the user before creating a new theme folder**. New themes are a structural change — they need a name, a homepage card, and a stats bump.
+If a topic doesn't fit, **ask the user before creating a new theme folder**. New themes are a structural change. The full checklist when one lands:
+
+- Create the theme folder and `theme/index.html` (model after `craft/index.html`).
+- Add a theme card to `index.html` (homepage), bump the "Themes" stat, and renumber any themes whose ordinal shifted.
+- Update the prev/next footer links of the two adjacent themes (and the new one).
+- **Register the new directory in `scripts/build_index.py`** — add it to both `THEME_DIRS` and `THEME_LABELS`. Without this, the new theme's pages are silently absent from the search index. (CI rebuilds the index on every push, but it can only see directories the script knows about.)
+- Update the theme matrix above so the next class's notes find the new theme.
 
 ### Step 3 — Write each topic page
 Use the template in §4 below. For each new technical term:
@@ -433,6 +461,7 @@ These shaped the current design. Honour them unless explicitly overridden.
 | Does the homepage need a "what's new" section? | No — the user declined this in M1. Just refresh stats. |
 | Should I put the deep-dive on Step 6 of the framework into the framework page or a separate page? | The framework page links out to existing topic pages for the deep-dive vocabulary. Don't duplicate. |
 | What if Class 04 has zero new topics (pure review)? | Still add a row to `classes.html` listing the topics covered. No new theme cards or topic pages needed. |
+| Where do recommended YouTube videos go? | `resources.html` only. Standalone page — see §2.7. Don't link from topic/case-study pages, don't index, don't add to glossary. |
 
 ---
 

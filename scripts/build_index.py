@@ -15,7 +15,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 THEME_DIRS = (
-    "distribution", "execution", "hardware", "performance",
+    "distribution", "execution", "hardware", "interfaces", "performance",
     "reliability", "craft", "case-studies",
 )
 ROOT_PAGES = ("index.html", "classes.html", "glossary.html")
@@ -27,6 +27,7 @@ THEME_LABELS = {
     "distribution": "Distribution",
     "execution":    "Execution",
     "hardware":     "Hardware",
+    "interfaces":   "Interfaces",
     "performance":  "Performance",
     "reliability":  "Reliability",
     "craft":        "Craft",
