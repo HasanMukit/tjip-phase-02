@@ -148,15 +148,15 @@ The trade-off in one sentence: **REST is slower on the wire but faster to ship, 
 
 HTTP defines a small set of methods; REST conventionally uses six of them.
 
-| Verb      | Purpose                                | Idempotent? | Safe? |
-| --------- | -------------------------------------- | ----------- | ----- |
-| `GET`     | Read a resource                        | yes         | yes (no side effects) |
-| `POST`    | Create a resource (typically)          | **no**      | no    |
-| `PUT`     | Replace a resource (full overwrite)    | yes         | no    |
-| `PATCH`   | Partially update a resource            | depends     | no    |
-| `DELETE`  | Remove a resource                      | yes         | no    |
-| `HEAD`    | Like `GET` but headers only            | yes         | yes   |
-| `OPTIONS` | Discover allowed methods (CORS preflight) | yes      | yes   |
+| Verb      | Purpose                                   | Idempotent? | Safe?                 |
+| --------- | ----------------------------------------- | ----------- | --------------------- |
+| `GET`     | Read a resource                           | yes         | yes (no side effects) |
+| `POST`    | Create a resource (typically)             | **no**      | no                    |
+| `PUT`     | Replace a resource (full overwrite)       | yes         | no                    |
+| `PATCH`   | Partially update a resource               | depends     | no                    |
+| `DELETE`  | Remove a resource                         | yes         | no                    |
+| `HEAD`    | Like `GET` but headers only               | yes         | yes                   |
+| `OPTIONS` | Discover allowed methods (CORS preflight) | yes         | yes                   |
 
 Two terms to nail:
 
@@ -463,13 +463,13 @@ The `interfaces/` theme (06) is live with four topic pages — `api-design.html`
   - `reliability/resilience-patterns.html` → `interfaces/api-design.html#idempotency` (retries are safe only if the operation is idempotent). Added in the idempotency callout and in the Related-topics block.
   - `distribution/api-gateway-pipeline.html` → `interfaces/https-handshake.html` (TLS termination is one of the proxy's three jobs; deep-dive lives on the new page now). Added inline in the TLS-termination section and in the Related-topics block.
   - `distribution/api-gateway-pipeline.html` → `interfaces/api-design.html` (the gateway is the surface this contract lives on). Added inline in the gateway intro and in the Related-topics block; also paired with a link to `api-best-practices.html`.
-- [ ] **Case-studies page (`case-studies/class-05.html`)** — write whenever the user is ready. Seeds:
-  - "We added retries and started double-charging customers" — POST without idempotency keys.
-  - "Page 50,000 of search results takes 20 seconds" — OFFSET cliff; needs cursor.
-  - "Our public REST API is slow, can we move it to gRPC?" — wrong axis; the slowness is round-trip count, not wire format. Diagnose before reaching for a new tool.
-  - "We migrated to GraphQL and now the database is on fire" — N+1 resolver problem; needs DataLoader.
-  - "Cert expired and the whole API went down" — certificate-rotation hygiene; cron + monitoring.
-  - "Our internal certs failed verification after we reissued" — trust store didn't include the new CA; the cert-vs-trust-anchor distinction.
+- [x] **Case-studies page (`case-studies/class-05.html`)** — shipped 2026-05-08. All six seeds landed as full cases (scenario / what's happening / terms-to-know / hidden-solution reveal). Wrap-up section pulls out three habits across all six (contract is load-bearing; diagnose before migrating; operationalise the "static" things). Linked from `case-studies/index.html` as a Class 05 row. Cross-links into `interfaces/api-design.html#idempotency`, `interfaces/pagination.html#cursor`, `interfaces/https-handshake.html#building-blocks`, plus reliability/resilience-patterns:
+  - Case 1: "We added retries and started double-charging customers" — POST without idempotency keys.
+  - Case 2: "Page 50,000 of search results takes 20 seconds" — OFFSET cliff; needs cursor.
+  - Case 3: "Our public REST API is slow, can we move it to gRPC?" — wrong axis; round-trip count not wire format. BFF endpoint is the fix.
+  - Case 4: "We migrated to GraphQL and now the database is on fire" — N+1 resolver; DataLoader + complexity budgets.
+  - Case 5: "Cert expired and the whole API went down" — automate ACME, alert before expiry, page a rotation not a person.
+  - Case 6: "Our internal certs failed verification after we reissued" — trust-anchor vs cert distinction; dual-bundle the trust store before swapping signatures.
 - [ ] **More-topics buffer** — user mentioned more topics will be added. New topics will likely fold into the existing three pages or land as additional siblings under `interfaces/`.
 
 ---

@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Class 05 Case Studies — TJIP Phase 02</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,700;1,9..144,400&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body data-base="../">
+    <nav class="site-nav">
+      <div class="site-nav-inner">
+        <a href="../index.html" class="site-logo"><span class="logo-dot"></span>TJIP · Phase 02</a>
+        <div class="site-nav-links">
+          <a href="../index.html">Themes</a>
+          <a href="../classes.html">Classes</a>
+          <a href="index.html" class="active">Case Studies</a>
+          <a href="../glossary.html">Glossary</a>
+          <a href="../resources.html">Resources</a>
+        </div>
+        <div class="site-search">
+          <input type="search" class="site-search-input" placeholder="Search topics…" autocomplete="off" />
+          <div class="site-search-results" hidden></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header>
+        <div class="eyebrow"><a href="index.html">← Case studies</a></div>
+        <h1>Interfaces <em>under load</em></h1>
+        <p class="deck">Six production scenarios that exercise idempotency, pagination shape, picking the right API style for the right reason, the GraphQL N+1 trap, and the two ways TLS certificates take a service down. Read the problem, work the diagnosis, then reveal the fix.</p>
+        <div class="meta">
+          <span class="class-pill">Class 05</span>
+          <span>Theme · Interfaces</span>
+        </div>
+      </header>
+
+      <div class="toc">
+        <div class="toc-title">Case studies</div>
+        <ol>
+          <li><a href="#cs1">We added retries and started double-charging customers</a></li>
+          <li><a href="#cs2">Page 50,000 of search results takes 20 seconds</a></li>
+          <li><a href="#cs3">"Our REST API is slow — can we move it to gRPC?"</a></li>
+          <li><a href="#cs4">We migrated to GraphQL and now the database is on fire</a></li>
+          <li><a href="#cs5">The cert expired and the whole API went down</a></li>
+          <li><a href="#cs6">Our internal certs failed verification after we reissued</a></li>
+        </ol>
+      </div>
+
+      <p class="lede">An API is a contract — and every contract has a failure mode that only shows up under traffic. Each scenario below pairs a real-world symptom with the part of the contract that was wrong, and ends with the smallest change that fixes it. Try your own answer before you reveal the solution; the lesson lands harder when you've already committed to a guess.</p>
+
+      <div class="callout">
+        <div class="callout-label">How to read this page</div>
+        Every case study has three blocks visible up front: <strong>Scenario</strong> (the setup), <strong>What's happening</strong> (the diagnosis), and <strong>Terms to know</strong> (the jargon defined in plain language). The <strong>solution</strong> is hidden behind a "Reveal" toggle. Drafting your own fix first is the point — the explanation makes more sense once you've already picked a direction.
+      </div>
+
+      <h2 id="cs1"><span class="num">01</span>We added retries and started double-charging customers</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Your payments service exposes <code>POST /payments</code>. Last week the team added an automatic-retry policy in the mobile client because a small percentage of requests were timing out at the gateway. Support tickets start flooding in: customers see two charges on their card for the same order. Logs confirm it — the same logical purchase produced two distinct payment rows, seconds apart, both successful.
+      </div>
+
+      <p><strong>What's happening.</strong> The retry policy is correct in spirit but unsafe against this endpoint. The original request <em>did</em> reach the server, the charge <em>did</em> land, and the response was lost on the way back to the client (gateway timeout, dropped connection, mobile radio handoff — pick one). The client can't tell the difference between "request never landed" and "request landed but reply got lost," so it retries. <code>POST /payments</code> isn't idempotent, so the second call creates a second payment. The protocol gave you the right semantics — <a class="glink" href="../glossary.html#idempotency">idempotent verbs are safe to retry, non-idempotent ones aren't</a> — and the retry policy ignored them.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Idempotent operation</dt>
+          <dd>Calling once and calling five times leaves the server in the same state. <code>GET</code>, <code>PUT</code>, <code>DELETE</code> are idempotent by construction. <code>POST</code> is not — every call creates a new resource.</dd>
+
+          <dt>Safe operation</dt>
+          <dd>An operation that doesn't change server state at all (<code>GET</code>, <code>HEAD</code>, <code>OPTIONS</code>). Safety implies idempotency; the converse isn't true.</dd>
+
+          <dt>Idempotency-Key header</dt>
+          <dd>A client-generated unique token (typically a UUID) that the server uses to deduplicate retries. First call does the work and stores the response; subsequent calls with the same key replay the stored response.</dd>
+
+          <dt>Natural-key dedup</dt>
+          <dd>Using a unique field already in the request body (<code>order_id</code>, <code>transaction_reference</code>) plus a database unique constraint to make the write idempotent without a special header.</dd>
+
+          <dt>At-least-once delivery</dt>
+          <dd>The retry contract: the server may see the same request more than once. Building APIs that survive at-least-once requires either idempotent operations or a dedup mechanism.</dd>
+
+          <dt>Replay attack</dt>
+          <dd>An attacker resends a captured idempotency key with a different body. The fix: bind the key to the body (e.g. reject if a replay arrives with a hash that doesn't match the first call's body).</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Two patterns; payments use both.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Make the endpoint idempotent <em>before</em> you turn retries on. Two patterns, used together at most payment companies:</p>
+
+          <div class="two-col">
+            <div class="card">
+              <h4>Idempotency-Key header</h4>
+              <p>Client generates a UUID per logical purchase and sends it on every retry. Server stores the full response (status code + body) under that key with a 24h TTL. First call processes; retries replay the stored answer. Stripe popularised this; most card APIs follow it.</p>
+            </div>
+            <div class="card">
+              <h4>Natural-key dedup at the DB</h4>
+              <p>Add a unique constraint on <code>(order_id)</code> in the payments table. Use <code>INSERT ... ON CONFLICT (order_id) DO NOTHING RETURNING *</code>. Even if the header layer fails, the database can't write a second row for the same order.</p>
+            </div>
+          </div>
+
+          <p>Three things to get right around the header:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Store the entire response, not just success/fail.</strong> A retry after a network blip wants the same body the first attempt produced — same payment ID, same timestamps. Otherwise the client builds two views of "the charge."</li>
+            <li><strong>TTL exceeds the retry budget.</strong> If the client retries for up to 10 minutes, the key store keeps the response for at least that long. Lose the key and you lose idempotency.</li>
+            <li><strong>Reject mismatched bodies.</strong> Same key + different body = either a client bug or a replay attack. Return <code>422</code>; never silently succeed.</li>
+          </ol>
+
+          <p class="pullquote">Retries are only safe if the operation is idempotent. The retry policy on the client and the idempotency mechanism on the server are two halves of the same contract.</p>
+
+          <p>See: <a href="../interfaces/api-design.html#idempotency">making <code>POST</code> safe to retry</a> · <a href="../reliability/resilience-patterns.html#retries">retries — storm, capping, backoff, jitter</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs2"><span class="num">02</span>Page 50,000 of search results takes 20 seconds</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Your product-search endpoint paginates with <code>?page=N&amp;per_page=20</code>, mapped server-side to <code>LIMIT 20 OFFSET (N-1)*20</code>. Page 1 returns in 30 ms. Page 50 returns in 80 ms. Page 5,000 takes 4 seconds. Page 50,000 — which a power-user crawler hits routinely — takes 20+ seconds and frequently times out. The product team asks if you "need a bigger database."
+      </div>
+
+      <p><strong>What's happening.</strong> <code>OFFSET 1000000</code> doesn't mean "skip a million rows cheaply" — it means the database scans and discards the first million rows before returning yours. The cost is <code>O(offset)</code>, not <code>O(limit)</code>. An index on the sort column helps the <em>ordering</em>, but doesn't avoid the discard step. There's no amount of hardware that fixes this; the query plan is fundamentally wrong shape for the workload. Worse, even if you bought your way out of the latency, offset pagination has a second bug — inserts and deletes shift rows between pages, so a user paging through a live-updating result set sees duplicates and gaps. The product team is asking for the wrong fix because they're reading the symptom (slow), not the shape (linear in offset).</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Offset/limit pagination</dt>
+          <dd>"Skip N rows, return the next M." Easy to reason about, supports random access ("Page 50 of 200"). Cost is <code>O(offset)</code> — the database has to scan past everything you skipped.</dd>
+
+          <dt>Cursor pagination</dt>
+          <dd>"Return rows that come after this opaque token." The token typically encodes the sort key of the last row served. Cost is <code>O(log N)</code> per page — an indexed seek to the cursor position.</dd>
+
+          <dt>Stable sort key</dt>
+          <dd>A monotonically increasing tuple (usually <code>(created_at, id)</code>) that totally orders the rows. Required for cursors so two rows with the same timestamp don't ambiguate the boundary.</dd>
+
+          <dt>Result-set drift</dt>
+          <dd>What happens to offset pagination when rows are inserted or deleted between page fetches. A row that was at position 20 is now at 21, so "page 2" repeats it. Or a deletion shifts row 21 to 20 and you skip a result entirely.</dd>
+
+          <dt>Opaque cursor</dt>
+          <dd>A base64-encoded blob the client treats as a black box. The server can sign or encrypt it so clients can't synthesise their own and lock you into a specific encoding forever.</dd>
+
+          <dt>Random-access pagination</dt>
+          <dd>The "jump to page 50" UX. Cursors don't support it (only forward/back-from-here). Offset does — which is the only thing it's actually good for.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Switch the pagination shape, not the database.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Replace offset with a cursor. The query stops scanning past discarded rows and starts seeking directly to the boundary.</p>
+
+          <p>Server runs:</p>
+
+          <pre><code>SELECT * FROM products
+WHERE (created_at, id) &lt; ($cursor_ts, $cursor_id)
+ORDER BY created_at DESC, id DESC
+LIMIT 20;</code></pre>
+
+          <p>The tuple comparison handles ties on <code>created_at</code> — without it, two products with identical timestamps could either both appear or both be skipped at the boundary. The response includes a <code>next_cursor</code> the client passes back unmodified for the next page. Cost drops from <code>O(50,000 × 20)</code> to <code>O(log N + 20)</code>; page 50,000 returns in single-digit milliseconds.</p>
+
+          <div class="callout">
+            <div class="callout-label">What you give up</div>
+            Cursors don't support "jump to page 50" — only "next from here" and (sometimes) "previous from here." For a search-results UI, that's almost always fine: users either scroll forward or refine the query. If a UI genuinely needs random-access pagination (an admin dashboard with "page N of M"), keep offset for that view but cap the maximum offset hard.
+          </div>
+
+          <p>Two implementation notes:</p>
+
+          <ul>
+            <li><strong>Make the cursor opaque.</strong> Base64-encode the tuple, optionally sign it. If you expose <code>cursor=12345</code>, clients will start crafting their own — and you'll never be able to change the encoding.</li>
+            <li><strong>Hard-cap the maximum page.</strong> Even after you ship cursor pagination, leave a defensive cap (e.g. 1000 pages forward) so a misbehaving crawler can't walk a billion-row table to its end.</li>
+          </ul>
+
+          <p>The general lesson: <strong>"slow at high pages" is a shape problem, not a hardware problem.</strong> If your dataset can have a million rows and users routinely scroll past the first thousand, you want cursor pagination — and you want it from v1, because adding it later is a breaking API change.</p>
+
+          <p>See: <a href="../interfaces/pagination.html#cursor">cursor pagination</a> · <a href="../interfaces/pagination.html#problems">why offset breaks</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs3"><span class="num">03</span>"Our REST API is slow — can we move it to gRPC?"</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Your mobile team is unhappy with the public REST API's performance. The home screen needs the user, their last 5 orders, each order's line items, and the user's saved addresses. Total wall-clock time on a good 4G connection: 2.4 seconds. An engineer pitches a rewrite: "JSON is verbose, parsing is slow, let's move to gRPC." A six-month migration is on the table.
+      </div>
+
+      <p><strong>What's happening.</strong> The pitch is optimising the wrong axis. JSON is verbose and gRPC's binary framing is genuinely cheaper — but the home-screen render isn't bottlenecked on bytes. Profile the request: 2.4 s breaks down as 4 sequential round-trips (user → orders → items → addresses), each ~500–600 ms on mobile, plus ~50 ms of parse and decode. Switching wire formats might shave the 50 ms. The 2,400 ms is round-trip count × RTT, and gRPC over the same network has the same RTT. Worse, the public web doesn't speak gRPC natively — you'd add a gRPC-Web proxy and re-implement the caching, debugging, and tooling stories you already get free with HTTP. The fix isn't a different protocol; it's fewer requests.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Round-trip time (RTT)</dt>
+          <dd>How long a packet takes to reach the server and a response to return. Same-DC: ~500 µs. Mobile 4G: 50–200 ms. Cross-region: 60–150 ms. Set by physics and routing, not by your wire format.</dd>
+
+          <dt>Over-fetching</dt>
+          <dd>The endpoint returns more fields than the client needs. <code>GET /users/123</code> returns 30 fields when the client wants 3. Cheap to fix in REST with sparse fieldsets (<code>?fields=id,name,email</code>); GraphQL collapses it for free.</dd>
+
+          <dt>Under-fetching</dt>
+          <dd>The endpoint returns less than the client needs in one call, forcing N+1 round-trips for related data. The thing actually killing the home screen here.</dd>
+
+          <dt>BFF (Backend-for-Frontend)</dt>
+          <dd>A thin server-side aggregator that fans out to multiple internal services and returns one shaped response per UI screen. One mobile round-trip; the fan-out happens inside the data centre where RTT is microseconds.</dd>
+
+          <dt>HTTP/2 multiplexing</dt>
+          <dd>Multiple concurrent requests over one TCP connection. Removes head-of-line blocking <em>between</em> requests but doesn't reduce the number of requests; doesn't help when each request depends on the previous one's response.</dd>
+
+          <dt>Wire format vs round-trip count</dt>
+          <dd>Two independent latency contributors. Wire format affects bytes-on-the-wire and parse time. Round-trip count affects how many sequential network hops the response waits on. Most "slow API" complaints are the latter.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Diagnose before reaching for a new tool. The fix is one endpoint, not a new protocol.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Don't migrate. Add a BFF endpoint that returns the entire home-screen payload in one round-trip:</p>
+
+          <pre><code>GET /home?user_id=123
+→ {
+    "user": { ... },
+    "orders": [ ... last 5, with items embedded ... ],
+    "addresses": [ ... ]
+  }</code></pre>
+
+          <p>Internal fan-out happens server-side over the data centre's microsecond-RTT network. The mobile client makes <strong>one</strong> 600 ms call instead of four sequential 600 ms calls. Total home-screen time drops from 2.4 s to ~0.7 s — a 70%+ improvement, no protocol change required. Same JSON, same fetch, same caching, same debugging.</p>
+
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Lever</th>
+                <th>What it changes</th>
+                <th>Verdict</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Switch to gRPC</td>
+                <td>Wire bytes (~30%), parse cost (~2× faster)</td>
+                <td style="color: var(--accent);">Wrong axis — saves ~50 ms of a 2,400 ms problem.</td>
+              </tr>
+              <tr>
+                <td>BFF endpoint</td>
+                <td>Round-trip count: 4 → 1</td>
+                <td style="color: var(--s2);">Right lever — saves ~1,800 ms.</td>
+              </tr>
+              <tr>
+                <td>GraphQL at the edge</td>
+                <td>Same as BFF, plus client-shaped responses</td>
+                <td>Equivalent for this case; more infrastructure.</td>
+              </tr>
+              <tr>
+                <td>Sparse fieldsets (<code>?fields=...</code>)</td>
+                <td>Bytes per response</td>
+                <td>Cheap REST-side fix for over-fetching; doesn't help here.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p>The general lesson: <strong>profile before you migrate.</strong> "REST is slow" usually means "we're making too many sequential requests" — and the fix is endpoint shape, not protocol. gRPC has its place (internal service-to-service where you control both ends and want speed plus types), but reaching for it because the public API feels slow on mobile is solving the wrong problem.</p>
+
+          <p>See: <a href="../interfaces/api-design.html#styles">three API styles compared</a> · <a href="../interfaces/api-design.html#issues">REST's wire cost — and why we keep picking it</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs4"><span class="num">04</span>We migrated to GraphQL and now the database is on fire</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Your team rolled out a GraphQL endpoint to fix over-fetching. A typical query asks for 50 users, each with their last 10 orders, each order with its line items. Latency is fine in dev with seed data. In production, the page that runs this query brings the database to its knees — DB CPU pinned at 100%, query log full of nearly-identical SELECTs, p95 on every endpoint blowing up.
+        <br><br>
+        Your monitoring shows the GraphQL server emitted <strong>501 SQL queries</strong> for <strong>one</strong> incoming request: 1 to load the users, then 50 to load each user's orders, then 450 to load each order's items.
+      </div>
+
+      <p><strong>What's happening.</strong> Classic <a class="glink" href="../glossary.html#graphql">N+1 resolver</a>. Each GraphQL field has its own resolver function, and the default implementation of "user.orders" is "given a user, run a query for that user's orders." When the query asks for 50 users, the framework calls the orders-resolver 50 times — each running its own DB round-trip, each independent of the others. Then for each of those orders, the items-resolver fires once per order. The query plan doesn't see the shape of the GraphQL request; it just sees 501 unrelated SELECTs arriving at once. The bug isn't in GraphQL; it's that the resolver layer didn't <em>batch</em> the per-parent fetches into a per-level fetch.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>N+1 query problem</dt>
+          <dd>One initial query returns N rows; for each row, the code runs an additional query to fetch related data. Total: N+1 queries for what should have been 2. Endemic to ORMs and GraphQL resolvers; absent in carefully-written hand SQL.</dd>
+
+          <dt>Resolver</dt>
+          <dd>A function GraphQL calls to populate one field of one type. Composes recursively — the orders resolver runs once per user, the items resolver runs once per order. Naive resolvers are the source of N+1.</dd>
+
+          <dt>DataLoader</dt>
+          <dd>A per-request batching/caching layer (Facebook's open-source pattern). Collects keys requested within the same tick of the event loop and runs one bulk fetch (<code>SELECT ... WHERE user_id IN (...)</code>) instead of one fetch per key.</dd>
+
+          <dt>Query complexity</dt>
+          <dd>A weight assigned to each field in a GraphQL schema. The total complexity of a query is summed and rejected if it exceeds a per-client budget. The right unit for rate-limiting GraphQL — request count is meaningless when one query can ask for the universe.</dd>
+
+          <dt>Persisted queries</dt>
+          <dd>The client registers each query with the server up-front; runtime calls send only a query ID + variables. Limits the client surface to a known set of queries, restores HTTP-level caching, and lets the server pre-analyse complexity.</dd>
+
+          <dt>Resolver-level caching</dt>
+          <dd>Caching at the field resolver, not at the URL. Replaces the URL-based caching REST gets free from the CDN/browser. Apollo Cache, GraphQL Mesh, and DataLoader's per-request cache all play here.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Batch the resolver fetches and budget the queries.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Two layers, applied together:</p>
+
+          <div class="two-col">
+            <div class="card">
+              <h4>Wrap every per-parent fetch in a DataLoader</h4>
+              <p>The orders-resolver no longer queries directly. It calls <code>ordersByUserLoader.load(user.id)</code>. DataLoader collects every key requested in the same event-loop tick and issues one query: <code>SELECT * FROM orders WHERE user_id IN (1, 2, ..., 50)</code>. The 501 queries collapse to 3 — one per level of the tree.</p>
+            </div>
+            <div class="card">
+              <h4>Budget queries by complexity</h4>
+              <p>Every field gets a cost; the query gets a budget. <code>users(first: 50) { orders(first: 10) { items }}</code> is roughly <code>50 × 10 × items_cost</code>. If a client tries <code>users(first: 10000)</code> they get rejected at parse time. Rate-limiting by request count doesn't work — one query can ask for nothing or everything.</p>
+            </div>
+          </div>
+
+          <p>Three operational rules that come with adopting GraphQL seriously:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>DataLoader is mandatory, not optional.</strong> If a junior engineer can write a resolver without it, your N+1 will reappear within a week. Lint for it; provide loaders centrally; make raw queries inside resolvers an exception.</li>
+            <li><strong>Persist queries from trusted clients.</strong> Your own apps don't need to send arbitrary GraphQL — register their queries up-front and reference by hash. Restores edge caching, eliminates whole classes of complexity attacks.</li>
+            <li><strong>Watch resolver-level metrics, not just endpoint metrics.</strong> Endpoint-level dashboards show <code>POST /graphql</code> at 200 ms; the right granularity is per-field — so you can see <em>which</em> resolver is slow.</li>
+          </ol>
+
+          <p class="pullquote">GraphQL solves over-fetching at the wire and creates an N+1 problem at the resolver. The fix is in the resolver layer, not the schema.</p>
+
+          <p>See: <a href="../interfaces/api-design.html#styles">GraphQL — what it solves and what it costs</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs5"><span class="num">05</span>The cert expired and the whole API went down</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        At 03:14 UTC, every client of <code>api.example.com</code> starts seeing <code>SSL_ERROR_BAD_CERT_DOMAIN</code> or <code>NET::ERR_CERT_DATE_INVALID</code>. Mobile apps fail to connect. Browsers show a full-screen interstitial. Status page goes red. Investigation: the public TLS certificate for <code>api.example.com</code> expired at 03:00 UTC. It had been renewed manually for years; the engineer who owned the calendar reminder left the company nine months ago.
+      </div>
+
+      <p><strong>What's happening.</strong> A TLS certificate is a signed document with a <code>notBefore</code> and <code>notAfter</code> date. Past the <code>notAfter</code>, every client that validates certificates rejects the connection — and almost every client validates by default. There's no graceful degradation, no warning period, no "expired but we'll allow it" mode. The certificate's job is to prove the server's identity; an expired one fails that proof. The system didn't break because of a code bug or a load spike; it broke because a piece of paper aged out and the renewal was a manual process tied to one person's calendar. This is an organizational failure dressed up as a technical one.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Certificate validity period</dt>
+          <dd>The time window <code>(notBefore, notAfter)</code> during which the certificate is valid. Public CAs cap leaf certificates at 13 months (will drop to 47 days in 2029). Past <code>notAfter</code>, every conforming client rejects the cert.</dd>
+
+          <dt>ACME / Let's Encrypt</dt>
+          <dd>The protocol and CA that made automated 90-day issuance the default. Tools like <code>certbot</code>, <code>cert-manager</code>, and Caddy renew certs every ~60 days without human involvement.</dd>
+
+          <dt>Certificate transparency</dt>
+          <dd>Public logs of every issued certificate. You can query CT logs (crt.sh) to find every cert issued for your domain — useful for inventory ("what certs are out there in our name?") and for spotting unauthorized issuance.</dd>
+
+          <dt>Lifecycle ownership</dt>
+          <dd>The organisational answer to "who renews this and what happens if they leave?" Paging is on a rotation, not a person. Calendar reminders attached to a team mailbox, not a single email address.</dd>
+
+          <dt>Multi-day pre-expiry alert</dt>
+          <dd>Monitoring that fires <em>weeks</em> before <code>notAfter</code>, not at expiry. Common thresholds: 30 days (warning), 14 days (page on-call), 7 days (incident).</dd>
+
+          <dt>Zero-downtime rotation</dt>
+          <dd>Reload the new cert into the running service without dropping connections. Most TLS-terminating servers (nginx, envoy, HAProxy) support a SIGHUP/admin-API reload that picks up the new cert atomically.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Automate the renewal, alert before expiry, never let the lifecycle live in one person's head.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Three layers, in priority order:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Automate issuance and renewal.</strong> Use ACME (Let's Encrypt) or your cloud's managed cert (ACM, Cloud Certificate Manager). <code>cert-manager</code> on Kubernetes; <code>certbot</code> with a systemd timer on bare metal. Cert lifetime drops to 90 days, renewal happens at 60 with a generous safety margin. The cert never reaches the expiry date because the system reissues weeks earlier — and if a renewal fails, you have a month of warning, not a 14-minute outage.</li>
+            <li><strong>Alert on remaining validity, not on expiry.</strong> Monitoring scrapes <code>notAfter</code> from the live cert (any TLS scanner does this — Prometheus blackbox-exporter, ssl_exporter, even <code>openssl s_client</code> in cron) and pages on-call when remaining lifetime drops below 14 days. The page goes to a rotation, not an individual.</li>
+            <li><strong>Inventory every certificate.</strong> Public CT logs plus internal scanning will surface certs you forgot about — wildcard, subdomain, internal mTLS, vendor integrations. The cert that takes you down is the one nobody owns.</li>
+          </ol>
+
+          <div class="callout">
+            <div class="callout-label">What "manual renewal" actually costs</div>
+            One person, one calendar, one annual reissue. Works fine for years until that person leaves, the calendar reminder fires into a defunct mailbox, the cert expires, and 100% of traffic stops in the same five minutes. The cost of automating ACME for one domain is a single <code>certbot</code> install. The cost of <em>not</em> automating it is exactly one outage of indeterminate length.
+          </div>
+
+          <p>The general lesson: <strong>any operational task that depends on a human remembering will eventually fail.</strong> Certificates are the canonical version of this — invisible most of the time, catastrophic on the day they aren't. Automate the renewal, alert before the deadline, page a rotation not a person.</p>
+
+          <p>See: <a href="../interfaces/https-handshake.html#building-blocks">certificates and the chain of trust</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="cs6"><span class="num">06</span>Our internal certs failed verification after we reissued</h2>
+
+      <div class="callout">
+        <div class="callout-label">Scenario</div>
+        Your platform team rotates the internal CA that signs service-to-service mTLS certificates. The new root cert is published; the leaf certs on every service get reissued and deployed. Within minutes, half the internal traffic starts failing with <code>x509: certificate signed by unknown authority</code>. The new leaf certs <em>are</em> valid. The new root <em>is</em> trusted by the services that were redeployed. But anything that hasn't redeployed since the rotation can't verify the new chain.
+      </div>
+
+      <p><strong>What's happening.</strong> A certificate is verified by walking the signature chain back to a root that the verifier <em>already trusts</em>. The trust anchors live in the verifier's <strong>trust store</strong>: a static list of CA public keys baked into the OS, the browser, the language runtime, or — for service-to-service mTLS — a config file mounted into each service. When you reissue under a new root CA, every leaf cert chains back to that new root. But services running with the <em>old</em> trust store don't know about the new root, so the chain ends at "unknown authority." The leaf cert is valid — just not from a CA the verifier has agreed to trust. The bug isn't in the certs; it's that "we issued a new cert" and "the verifier learned about the new CA" are two separate operations and the team conflated them.</p>
+
+      <div class="terms">
+        <div class="terms-label">Terms to know</div>
+        <dl>
+          <dt>Trust store / trust anchor</dt>
+          <dd>The static set of CA public keys the verifier accepts as roots of trust. Public web: ~150 CAs shipped in browsers and operating systems. Private mTLS: usually one internal CA, distributed via config or a secret mount.</dd>
+
+          <dt>Certificate chain</dt>
+          <dd>Leaf cert → intermediate CA → root CA. The verifier walks the chain and rejects if it can't terminate at a root in its trust store. "Unknown authority" almost always means the chain is correct but the root isn't trusted — not that the cert is malformed.</dd>
+
+          <dt>Cert vs trust anchor</dt>
+          <dd>The cert proves "this key belongs to this name." The trust anchor decides whether you believe the proof. They're independent — issuing a new cert doesn't update anyone's trust store.</dd>
+
+          <dt>CA bundle</dt>
+          <dd>The file (often <code>ca-certificates.crt</code> or a Kubernetes secret) that holds the trust anchors. Adding a new CA means modifying this file and restarting the verifier — not just deploying a new leaf.</dd>
+
+          <dt>Cross-signed root</dt>
+          <dd>A new root that's also signed by an old, already-trusted root. Verifiers with the old trust store still accept the new chain via the cross-signature. The standard escape hatch for rolling root rotations.</dd>
+
+          <dt>Trust-then-rotate sequence</dt>
+          <dd>Operationally: distribute the new trust anchor first, wait until every verifier has it, <em>then</em> reissue leaves under the new root. The reverse order causes exactly this outage.</dd>
+        </dl>
+      </div>
+
+      <details class="solution-reveal">
+        <summary>
+          <span>Reveal the solution
+            <span class="solution-hint">Distribute trust before you cut over signatures.</span>
+          </span>
+        </summary>
+        <div class="solution-body">
+          <p><strong>Solution.</strong> Roll forward, in this order:</p>
+
+          <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+            <li><strong>Bundle both old and new roots.</strong> Update the trust store on every service to include both the old CA and the new CA. Deploy. Wait until every service is running with the dual-root bundle. Verify with a fleet-wide check.</li>
+            <li><strong>Then reissue leaves under the new root.</strong> Now both old leaves (signed by the old CA) and new leaves (signed by the new CA) verify against every service's trust store. Roll out new leaves at whatever cadence you like; nothing breaks during the transition.</li>
+            <li><strong>Then drop the old root.</strong> Once every leaf is reissued, remove the old CA from the trust bundle. The system is now fully on the new root; the old one is no longer accepted.</li>
+          </ol>
+
+          <p>The key insight: <strong>distribute trust first, signatures second.</strong> If you swap the order, every verifier that hasn't rebooted is still on the old trust store, and every new leaf cert looks unsigned to it. Doing it the other way round is reversible (drop the new bundle, you're back where you started); doing it the wrong way around is an outage that lasts as long as it takes to roll the trust store everywhere — usually longer than your incident channel can stay calm.</p>
+
+          <div class="callout">
+            <div class="callout-label">Cross-signing as a shortcut</div>
+            For very large fleets where dual-bundling is hard, the alternative is to have the new root <em>also</em> signed by the old root (a "cross-sign"). Verifiers that only know the old root still see a chain ending at a root they trust, via the cross-signature. Let's Encrypt's IdenTrust cross-sign worked exactly this way during the ISRG Root X1 rollout. Inside a single org, dual-bundling is usually simpler than getting cross-signs right.
+          </div>
+
+          <p>The general lesson: <strong>certificates and trust anchors are separate concerns.</strong> "We issued new certs" and "the verifier accepts the new CA" are two deploys, not one. Treat them in sequence, with monitoring between, and the rotation is a non-event instead of an incident.</p>
+
+          <p>See: <a href="../interfaces/https-handshake.html#building-blocks">keys, certs, and the trust store</a>.</p>
+        </div>
+      </details>
+
+      <h2 id="wrap"><span class="num">07</span>The pattern across all six</h2>
+
+      <p>Three habits come out of these six cases, and they're the working playbook for owning an API in production:</p>
+
+      <ol style="font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.75; color: var(--muted); margin: 0 0 24px 20px;">
+        <li><strong>Treat the contract as load-bearing.</strong> Idempotency, pagination shape, and the verbs you pick aren't cosmetic — they decide whether retries double-charge customers, whether deep pages cripple the database, and whether the next breaking change costs you a month of client migrations. Get them right at v1; retrofitting them is a contract change.</li>
+        <li><strong>Diagnose before you migrate.</strong> Most "REST is slow" complaints are round-trip count, not wire format. Most "GraphQL is fast" wins evaporate the moment a naive resolver hits a real-world database. Profile first; reach for the new tool only when the diagnosis points there.</li>
+        <li><strong>Operationalise the things that look "static."</strong> Certificates expire. Trust stores drift. CAs rotate. None of these break on the day you ship — they break months later, when the person who owned the calendar reminder has left. Automate the lifecycle, alert before the deadline, page a rotation not a person.</li>
+      </ol>
+
+      <p>Every interface problem you'll chase in production is a variation of one of these. The names change; the shape doesn't.</p>
+
+      <div class="related-topics">
+        <div class="related-label">Related topics</div>
+        <ul class="related-list">
+          <li>
+            <a href="../interfaces/api-design.html">
+              <span class="related-arrow">→</span>
+              <span>API Design</span>
+              <span class="related-summary">— REST vs RPC vs GraphQL, verbs, idempotency. Cases 1, 3, 4 in their own right.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../interfaces/pagination.html">
+              <span class="related-arrow">→</span>
+              <span>Pagination</span>
+              <span class="related-summary">— offset's cliff, cursor's seek, when to pick which. Case 2 deep-dive.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../interfaces/https-handshake.html">
+              <span class="related-arrow">→</span>
+              <span>HTTPS Handshake</span>
+              <span class="related-summary">— certs, chain of trust, Diffie-Hellman. The model behind cases 5 and 6.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../interfaces/api-best-practices.html">
+              <span class="related-arrow">→</span>
+              <span>API Best Practices</span>
+              <span class="related-summary">— eleven habits + one bonus. The rules these scenarios were violating.</span>
+            </a>
+          </li>
+          <li>
+            <a href="../reliability/resilience-patterns.html">
+              <span class="related-arrow">→</span>
+              <span>Resilience Patterns</span>
+              <span class="related-summary">— retries, circuit breakers, throttling. Case 1 starts here.</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer class="site-footer">
+      Class 05 · Interfaces. <a href="index.html" style="color: var(--accent)">Back to case-studies hub →</a> · Drawn from payment-API post-mortems, search-pagination war stories, and the eternal certificate-rotation incident
+    </footer>
+    <script src="../search.js" defer></script>
+  </body>
+</html>
