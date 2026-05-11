@@ -35,7 +35,13 @@
       "Bash(curl -sI https://hasanmukit.github.io/tjip-phase-02/search.js)",
       "Bash(grep -E \"\\\\.\\(js|ts|py|sh\\)$\")",
       "Bash(chmod +x /Users/rakibulhasan/Desktop/personal/practice/tjip/tjip-phase-02/scripts/preview.sh)",
-      "Bash(grep -v -E '^\\(anchor|term|term-a|term-b\\)$')"
+      "Bash(grep -v -E '^\\(anchor|term|term-a|term-b\\)$')",
+      "Bash(grep *)",
+      "Bash(lsof -ti:8000)",
+      "Bash(lsof -ti:8001)",
+      "Bash(PORT=8001 ./scripts/preview.sh *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8001/styles.css)",
+      "Bash(curl -s \"http://localhost:8001/styles.css\")"
     ]
   }
 }

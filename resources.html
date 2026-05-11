@@ -12,23 +12,34 @@
     />
     <link rel="stylesheet" href="styles.css" />
     <style>
-      .resource-class { margin-bottom: 56px; }
+      .resource-class {
+        margin-bottom: 56px;
+      }
 
       .resource-class-head {
         display: flex;
         align-items: flex-start;
         gap: 20px;
-        padding: 0 0 18px 0;
+        padding: 16px 0 18px 0;
         border-bottom: 1px solid var(--rule);
         margin-bottom: 28px;
+        /* Stick to the top of the main column as topics scroll underneath. */
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: var(--paper);
       }
 
-      .resource-class-head .class-num { padding-top: 6px; }
+      .resource-class-head .class-num {
+        padding-top: 6px;
+      }
 
-      .resource-topic { margin-bottom: 36px; }
+      .resource-topic {
+        margin-bottom: 36px;
+      }
 
       .resource-topic-title {
-        font-family: 'Inter', sans-serif;
+        font-family: "Inter", sans-serif;
         font-size: 13px;
         font-weight: 600;
         letter-spacing: 0.08em;
@@ -38,18 +49,48 @@
       }
 
       .resource-topic-title .topic-num {
-        font-family: 'JetBrains Mono', monospace;
+        font-family: "JetBrains Mono", monospace;
         color: var(--accent);
         margin-right: 8px;
       }
 
-      .resource-topic .data-table { margin-top: 14px; }
+      .resource-topic .data-table {
+        margin-top: 14px;
+        table-layout: fixed;
+      }
+
+      .resource-topic .data-table th:nth-child(1),
+      .resource-topic .data-table td:nth-child(1) {
+        width: 60%;
+      }
+      .resource-topic .data-table th:nth-child(2),
+      .resource-topic .data-table td:nth-child(2) {
+        width: 28%;
+      }
+      .resource-topic .data-table th:nth-child(3),
+      .resource-topic .data-table td:nth-child(3) {
+        width: 12%;
+      }
+
+      .resource-topic .data-table td {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
 
       .resource-topic .data-table td:first-child a {
+        display: inline-block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        vertical-align: bottom;
         color: var(--ink);
         text-decoration: none;
         border-bottom: 1px solid var(--rule);
-        transition: color 0.15s, border-color 0.15s;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
       }
 
       .resource-topic .data-table td:first-child a:hover {
@@ -57,69 +98,21 @@
         border-bottom-color: var(--accent);
       }
 
-      html { scroll-behavior: smooth; }
-      .resource-class { scroll-margin-top: 24px; }
-
-      .resource-jump {
-        max-width: 1080px;
-        margin: 0 auto;
-        padding: 32px 32px 0;
+      html {
+        scroll-behavior: smooth;
       }
-
-      .resource-jump-label {
-        font-family: 'Inter', sans-serif;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin-bottom: 14px;
+      .resource-class {
+        scroll-margin-top: 24px;
       }
-
-      .resource-jump-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 10px;
-      }
-
-      .resource-jump-list a {
-        display: flex;
-        align-items: baseline;
-        gap: 12px;
-        padding: 14px 18px;
-        border: 1px solid var(--rule);
-        border-radius: 6px;
-        background: var(--paper-card);
-        color: var(--ink);
-        text-decoration: none;
-        transition: border-color 0.15s, transform 0.15s;
-      }
-
-      .resource-jump-list a:hover {
-        border-color: var(--accent);
-        transform: translateY(-1px);
-      }
-
-      .resource-jump-list .jump-num {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 11px;
-        font-weight: 500;
-        color: var(--accent);
-        letter-spacing: 0.1em;
-      }
-
-      .resource-jump-list .jump-title {
-        font-family: 'Fraunces', Georgia, serif;
-        font-size: 16px;
-        font-weight: 400;
-        line-height: 1.25;
+      .resource-topic {
+        scroll-margin-top: 24px;
       }
 
       .upcoming-pill {
         display: inline-block;
         margin-left: 10px;
         padding: 2px 8px;
-        font-family: 'Inter', sans-serif;
+        font-family: "Inter", sans-serif;
         font-size: 10px;
         font-weight: 600;
         letter-spacing: 0.12em;
@@ -130,8 +123,339 @@
         vertical-align: middle;
       }
 
+      /* Desktop: lock the page to one viewport so body scroll stops once the
+         two-pane section reaches the nav. Mobile falls through to normal scroll. */
+      @media (min-width: 1024px) {
+        body {
+          display: flex;
+          flex-direction: column;
+          height: 100vh;
+          overflow: hidden;
+        }
+        .site-footer {
+          flex: 0 0 auto;
+        }
+        .classes-section {
+          flex: 1 1 auto;
+          min-height: 0;
+        }
+      }
+
+      /* Sidebar layout — 2-col grid at desktop, stacked at mobile */
+      .classes-section {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 32px 32px 32px;
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        column-gap: 56px;
+        align-items: stretch;
+        width: 100%;
+      }
+
+      .resource-toc {
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        padding-right: 8px;
+        /* Scroll-chain guard: scrolling inside the sidebar doesn't bubble to the page. */
+        overscroll-behavior: contain;
+        /* Themed scrollbar — Firefox */
+        scrollbar-width: thin;
+        scrollbar-color: var(--rule) transparent;
+      }
+
+      /* Themed scrollbar — WebKit / Blink */
+      .resource-toc::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .resource-toc::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .resource-toc::-webkit-scrollbar-thumb {
+        background: var(--rule);
+        border-radius: 999px;
+        transition: background 0.2s;
+      }
+
+      .resource-toc:hover::-webkit-scrollbar-thumb {
+        background: var(--muted);
+      }
+
+      .resource-toc::-webkit-scrollbar-thumb:hover,
+      .resource-toc::-webkit-scrollbar-thumb:active {
+        background: var(--accent);
+      }
+
+      /* Right column: independent scroll, fills the section grid row. */
+      .resource-main {
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: var(--rule) transparent;
+        /* Inner padding so content doesn't sit flush against the scrollbar. */
+        padding-right: 12px;
+      }
+
+      .resource-main::-webkit-scrollbar {
+        width: 8px;
+      }
+      .resource-main::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .resource-main::-webkit-scrollbar-thumb {
+        background: var(--rule);
+        border-radius: 999px;
+        transition: background 0.2s;
+      }
+      .resource-main:hover::-webkit-scrollbar-thumb {
+        background: var(--muted);
+      }
+      .resource-main::-webkit-scrollbar-thumb:hover,
+      .resource-main::-webkit-scrollbar-thumb:active {
+        background: var(--accent);
+      }
+
+      .resource-toc-label {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+
+      .resource-toc nav {
+        display: block;
+      }
+
+      .toc-group {
+        margin-top: 14px;
+      }
+      .toc-group:first-child {
+        margin-top: 0;
+      }
+
+      .resource-toc .toc-class {
+        display: block;
+        padding: 4px 0 4px 10px;
+        border-left: 2px solid transparent;
+        color: var(--ink);
+        font-weight: 600;
+        font-size: 13px;
+        line-height: 1.35;
+        text-decoration: none;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+
+      .resource-toc ul {
+        list-style: none;
+        padding: 0;
+        margin: 4px 0 0 0;
+      }
+
+      .resource-toc li a {
+        display: block;
+        padding: 3px 0 3px 10px;
+        border-left: 2px solid transparent;
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.4;
+        text-decoration: none;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+
+      .resource-toc a:hover {
+        color: var(--accent);
+      }
+
+      .resource-toc a.active {
+        color: var(--accent);
+        border-left-color: var(--accent);
+      }
+
+      .resource-toc .toc-group.is-active .toc-class {
+        color: var(--accent);
+        border-left-color: var(--accent);
+      }
+
+      /* Focus mode: hide non-active class blocks in main column. Sidebar always shows everything. */
+      .resource-main .resource-class {
+        display: none;
+      }
+      .resource-main .resource-class.is-visible {
+        display: block;
+      }
+
+      @media (max-width: 1023px) {
+        /* Drop the 2-pane grid; the TOC becomes a sticky chip bar above the content. */
+        .classes-section {
+          display: block;
+          padding: 0 0 80px;
+          max-width: none;
+        }
+
+        .resource-toc {
+          position: sticky;
+          top: 56px; /* sits just below the .site-nav (56px tall) */
+          z-index: 10;
+          height: auto;
+          min-height: 0;
+          margin: 0;
+          padding: 10px 16px;
+          background: var(--paper);
+          border-bottom: 1px solid var(--rule);
+          overflow-x: auto;
+          overflow-y: hidden;
+          overscroll-behavior-x: contain;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: none;
+        }
+        .resource-toc::-webkit-scrollbar {
+          display: none;
+        }
+        .resource-toc-inner {
+          width: max-content;
+        }
+        .resource-toc-label {
+          display: none;
+        }
+        .resource-toc nav {
+          display: flex;
+          gap: 8px;
+        }
+        .toc-group {
+          margin-top: 0;
+          flex: 0 0 auto;
+        }
+        /* Topic links collapse on mobile — class-level nav only, scroll within a class. */
+        .resource-toc ul {
+          display: none;
+        }
+        .resource-toc .toc-class {
+          display: inline-block;
+          padding: 7px 13px;
+          border: 1px solid var(--rule);
+          border-radius: 999px;
+          font-size: 12.5px;
+          font-weight: 600;
+          line-height: 1.2;
+          color: var(--ink);
+          white-space: nowrap;
+        }
+        .resource-toc .toc-group.is-active .toc-class {
+          color: var(--paper);
+          background: var(--accent);
+          border-color: var(--accent);
+        }
+
+        /* Main column: flow naturally now that the section isn't a grid. */
+        .resource-main {
+          height: auto;
+          min-height: 0;
+          overflow: visible;
+          padding: 0 20px;
+        }
+        /* Class head doesn't need to stick on mobile — the chip bar shows you where you are. */
+        .resource-class-head {
+          position: static;
+          margin-bottom: 20px;
+          padding-top: 24px;
+        }
+        /* Reserve space for site-nav (56) + chip bar (~46) when jumping to a class/topic. */
+        .resource-class,
+        .resource-topic {
+          scroll-margin-top: 110px;
+        }
+      }
+
       @media (max-width: 640px) {
-        .resource-class-head { flex-wrap: wrap; gap: 12px; }
+        /* Stack the class-num label above the title instead of side-by-side —
+           saves the ~50px gutter the desktop layout reserves for the number. */
+        .resource-class-head {
+          flex-direction: column;
+          gap: 4px;
+        }
+        .resource-class-head .class-num {
+          padding-top: 0;
+          min-width: 0;
+        }
+
+        /* Collapse the 3-column table into a stacked card per row:
+           Title on its own line, Channel · Duration as a meta line below.
+           Avoids the duration being clipped by the 12% fixed column. */
+        .resource-topic .data-table {
+          display: block;
+          table-layout: auto;
+          background: var(--paper-warm);
+        }
+        .resource-topic .data-table thead {
+          display: none;
+        }
+        .resource-topic .data-table tbody,
+        .resource-topic .data-table tr {
+          display: block;
+          width: 100%;
+        }
+        .resource-topic .data-table tr {
+          padding: 12px 14px;
+          border-bottom: 1px solid var(--rule);
+        }
+        .resource-topic .data-table tbody tr:last-child {
+          border-bottom: none;
+        }
+        .resource-topic .data-table td {
+          display: block;
+          padding: 0;
+          border: none;
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
+          width: auto;
+        }
+        /* Override the desktop 60/28/12 column widths — they have higher
+           specificity (:nth-child) than the bare td selector above. */
+        .resource-topic .data-table td:nth-child(1),
+        .resource-topic .data-table td:nth-child(2),
+        .resource-topic .data-table td:nth-child(3) {
+          width: auto;
+        }
+        .resource-topic .data-table td:first-child {
+          margin-bottom: 6px;
+          font-size: 13.5px;
+          line-height: 1.4;
+        }
+        .resource-topic .data-table td:first-child a {
+          display: inline;
+          max-width: none;
+          white-space: normal;
+          overflow: visible;
+          text-overflow: clip;
+        }
+        .resource-topic .data-table td:nth-child(2),
+        .resource-topic .data-table td:nth-child(3) {
+          display: inline;
+          font-size: 11.5px;
+          color: var(--muted);
+        }
+        .resource-topic .data-table td:nth-child(2)::after {
+          content: " · ";
+          margin: 0 2px;
+        }
+        .resource-topic .data-table td.mono {
+          font-size: 11.5px;
+        }
       }
     </style>
   </head>
@@ -149,797 +473,1648 @@
       </div>
     </nav>
 
-    <section class="hero">
-      <div class="hero-eyebrow">Resources</div>
-      <h1>Recommended <em>videos</em>.</h1>
-      <p class="hero-deck">
-        Short, complete YouTube videos that deepen each class's topics. Grouped by class, then by topic. Every title links out — clicks open in a new tab.
-      </p>
-    </section>
-
-    <section class="resource-jump" aria-label="Jump to class">
-      <div class="resource-jump-label">Jump to class</div>
-      <div class="resource-jump-list">
-        <a href="#class-03"><span class="jump-num">03</span><span class="jump-title">Performance Fundamentals</span></a>
-        <a href="#class-04"><span class="jump-num">04</span><span class="jump-title">The Path of a Request</span></a>
-        <a href="#class-05"><span class="jump-num">05</span><span class="jump-title">API Design</span></a>
-        <a href="#class-06"><span class="jump-num">06</span><span class="jump-title">Schema Design &amp; Indexes</span></a>
-      </div>
-    </section>
-
     <section class="classes-section">
-
-      <!-- ============== CLASS 03 ============== -->
-      <div class="resource-class" id="class-03">
-        <div class="resource-class-head">
-          <span class="class-num">CLASS 03</span>
-          <div class="class-info">
-            <div class="class-title">Performance Fundamentals</div>
-            <div class="class-summary">
-              The vocabulary of fast systems — percentiles, queues, retries — and the napkin math that backs them.
+      <aside class="resource-toc" aria-label="Page contents">
+        <div class="resource-toc-inner">
+          <div class="resource-toc-label">On this page</div>
+          <nav>
+            <div class="toc-group" data-class="foundations">
+              <a href="#foundations" class="toc-class">Foundations · SQL Primer</a>
+              <ul>
+                <li><a href="#foundations-p1">P1 · Big Picture &amp; Syntax</a></li>
+                <li><a href="#foundations-p2">P2 · Relational Data &amp; Joining</a></li>
+                <li><a href="#foundations-p3">P3 · Intermediate Querying</a></li>
+                <li><a href="#foundations-p4">P4 · Under the Hood</a></li>
+              </ul>
             </div>
+            <div class="toc-group" data-class="class-03">
+              <a href="#class-03" class="toc-class">Class 03 · Performance Fundamentals</a>
+              <ul>
+                <li><a href="#class-03-t01">01 · Percentiles (p50/p95/p99)</a></li>
+                <li><a href="#class-03-t02">02 · Queueing &amp; Little's Law</a></li>
+                <li><a href="#class-03-t03">03 · Napkin Math</a></li>
+                <li><a href="#class-03-t04">04 · Concurrency &amp; Threads</a></li>
+                <li><a href="#class-03-t05">05 · Tail Latency &amp; Retry Storms</a></li>
+                <li><a href="#class-03-t06">06 · Latency Numbers</a></li>
+              </ul>
+            </div>
+            <div class="toc-group" data-class="class-04">
+              <a href="#class-04" class="toc-class">Class 04 · Path of a Request</a>
+              <ul>
+                <li><a href="#class-04-t01">01 · DNS Fundamentals</a></li>
+                <li><a href="#class-04-t02">02 · DNS TTL &amp; Shifting</a></li>
+                <li><a href="#class-04-t03">03 · Reverse Proxy</a></li>
+                <li><a href="#class-04-t04">04 · L4 vs L7 Load Balancing</a></li>
+                <li><a href="#class-04-t05">05 · Retry, Timeout, Circuit Breaker</a></li>
+                <li><a href="#class-04-t06">06 · Sticky vs Stateless</a></li>
+              </ul>
+            </div>
+            <div class="toc-group" data-class="class-05">
+              <a href="#class-05" class="toc-class">Class 05 · API Design</a>
+              <ul>
+                <li><a href="#class-05-t01">01 · Best Practices</a></li>
+                <li><a href="#class-05-t02">02 · REST vs RPC vs GraphQL</a></li>
+                <li><a href="#class-05-t03">03 · Idempotency</a></li>
+                <li><a href="#class-05-t04">04 · Pagination &amp; Response Shape</a></li>
+                <li><a href="#class-05-t05">05 · Versioning Strategies</a></li>
+                <li><a href="#class-05-t06">06 · Error Models &amp; Status Codes</a></li>
+                <li><a href="#class-05-t07">07 · Bonus: Stripe Patterns</a></li>
+              </ul>
+            </div>
+            <div class="toc-group" data-class="class-06">
+              <a href="#class-06" class="toc-class">Class 06 · Schema Design &amp; Indexes</a>
+              <ul>
+                <li><a href="#class-06-t01">01 · Query-First Schema Design</a></li>
+                <li><a href="#class-06-t02">02 · Keys &amp; Normalization</a></li>
+                <li><a href="#class-06-t03">03 · Index Internals (B-Tree)</a></li>
+                <li><a href="#class-06-t04">04 · Write Amplification</a></li>
+                <li><a href="#class-06-t05">05 · EXPLAIN &amp; Query Tuning</a></li>
+                <li><a href="#class-06-t06">06 · Normalize vs Denormalize</a></li>
+              </ul>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <div class="resource-main">
+        <!-- ============== FOUNDATIONS ============== -->
+        <div class="resource-class" id="foundations">
+          <div class="resource-class-head">
+            <span class="class-num">FOUNDATIONS</span>
+            <div class="class-info">
+              <div class="class-title">SQL Primer — Beginner Curriculum</div>
+              <div class="class-summary">
+                A 4-phase video track for anyone new to SQL or relational databases. Start here if Class 06's schema and
+                index material feels too deep.
+              </div>
+            </div>
+          </div>
+
+          <div class="resource-topic" id="foundations-p1">
+            <h3 class="resource-topic-title"><span class="topic-num">P1</span>Big Picture &amp; Syntax Basics</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=yMqldbY2AAg" target="_blank" rel="noopener noreferrer"
+                      >Roadmap for Learning SQL</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">6:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=Cz3WcZLRaWc" target="_blank" rel="noopener noreferrer"
+                      >MySQL — The Basics in 23 Easy Steps</a
+                    >
+                  </td>
+                  <td>Fireship</td>
+                  <td class="mono">17:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=_vxobA36UN4" target="_blank" rel="noopener noreferrer"
+                      >Learn 12 Basic SQL Concepts in 15 Minutes</a
+                    >
+                  </td>
+                  <td>Maven Analytics</td>
+                  <td class="mono">17:00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="foundations-p2">
+            <h3 class="resource-topic-title"><span class="topic-num">P2</span>Relational Data &amp; Joining</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=27VeGN1h0Pw" target="_blank" rel="noopener noreferrer"
+                      >Introduction to Database Normalization (1NF, 2NF, 3NF)</a
+                    >
+                  </td>
+                  <td>Cody Baldwin</td>
+                  <td class="mono">5:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=FuFRMegSgL8" target="_blank" rel="noopener noreferrer"
+                      >SQL JOINs Explained Simply (INNER, LEFT, RIGHT, FULL)</a
+                    >
+                  </td>
+                  <td>Decomplexify</td>
+                  <td class="mono">4:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=VQf0V6Wwbf4" target="_blank" rel="noopener noreferrer"
+                      >GROUP BY and HAVING Clause in SQL</a
+                    >
+                  </td>
+                  <td>Neso Academy</td>
+                  <td class="mono">8:00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="foundations-p3">
+            <h3 class="resource-topic-title"><span class="topic-num">P3</span>Intermediate Querying</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=tlvxb7UduJw" target="_blank" rel="noopener noreferrer"
+                      >When to Use a Subquery in SQL</a
+                    >
+                  </td>
+                  <td>Database Star</td>
+                  <td class="mono">9:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=ZaFMM-vNlvc" target="_blank" rel="noopener noreferrer"
+                      >SQL CTEs (Common Table Expressions) — Why &amp; How</a
+                    >
+                  </td>
+                  <td>Database Star</td>
+                  <td class="mono">8:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=gFV6QA7bWPQ" target="_blank" rel="noopener noreferrer"
+                      >SQL Window Functions Explained (ROW_NUMBER, RANK)</a
+                    >
+                  </td>
+                  <td>techTFQ</td>
+                  <td class="mono">11:00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="foundations-p4">
+            <h3 class="resource-topic-title"><span class="topic-num">P4</span>Under the Hood</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=BHwzDmr6d7s" target="_blank" rel="noopener noreferrer"
+                      >Secret To Optimizing SQL Queries — Execution Order</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">6:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=Jemuod4wKWo" target="_blank" rel="noopener noreferrer"
+                      >What is a Database Index?</a
+                    >
+                  </td>
+                  <td>Hussein Nasser</td>
+                  <td class="mono">5:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=K1a2Bk8NrYQ" target="_blank" rel="noopener noreferrer"
+                      >Understanding B-Trees: The Data Structure Behind Modern Databases</a
+                    >
+                  </td>
+                  <td>Spanning Tree</td>
+                  <td class="mono">13:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=GAe5oB742dw" target="_blank" rel="noopener noreferrer"
+                      >ACID Properties in Databases With Examples</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=KoULlXKK1H8" target="_blank" rel="noopener noreferrer"
+                      >Serializable vs Repeatable Read Isolation Level</a
+                    >
+                  </td>
+                  <td>Hussein Nasser</td>
+                  <td class="mono">8:00</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">01</span>Averages vs Percentiles (p50 / p95 / p99)</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=9rlGSahksLQ" target="_blank" rel="noopener noreferrer">What are P50, P95, P99?</a></td>
-                <td>Kamran Ahmed</td>
-                <td class="mono">1:28</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=3JdQOExKtUY" target="_blank" rel="noopener noreferrer">Percentile Tail Latency Explained (95%, 99%)</a></td>
-                <td>Hussein Nasser</td>
-                <td class="mono">6:15</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=lJ4NEMNBeS4" target="_blank" rel="noopener noreferrer">Mastering Latency Metrics: P90, P95, P99</a></td>
-                <td>ByteMonk</td>
-                <td class="mono">6:41</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">02</span>Queueing, Little's Law, Saturation Curves</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=jeiQvHctlng" target="_blank" rel="noopener noreferrer">Why Every (great) System Design Uses Queues</a></td>
-                <td>Arjay McCandless</td>
-                <td class="mono">4:59</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=ErGP8kiLoC4" target="_blank" rel="noopener noreferrer">The Math Behind System Design (That Nobody Talks About)</a></td>
-                <td>Rant &amp; Reload</td>
-                <td class="mono">3:23</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=aVFF2hWy1-Y" target="_blank" rel="noopener noreferrer">Little's Law Simple Form</a></td>
-                <td>Shrinivas Gondhalekar</td>
-                <td class="mono">6:53</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=k_m3nEBR8jA" target="_blank" rel="noopener noreferrer">Queues, Hockey Sticks and Performance</a></td>
-                <td>ScyllaDB (P99 CONF)</td>
-                <td class="mono">15:24</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">03</span>Back-of-Envelope / Napkin Math</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=UC5xf8FbdJc" target="_blank" rel="noopener noreferrer">Back-Of-The-Envelope Estimation</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">8:32</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=0myM0k1mjZw" target="_blank" rel="noopener noreferrer">How much data does YouTube store daily?</a></td>
-                <td>Gaurav Sen</td>
-                <td class="mono">13:12</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">04</span>Concurrency, Threads, Context Switching</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=RlM9AfWf1WU" target="_blank" rel="noopener noreferrer">Concurrency Vs Parallelism</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">4:13</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=x-nM3PlmOB0" target="_blank" rel="noopener noreferrer">Why More Threads Can Slow Down Servers</a></td>
-                <td>The Leap</td>
-                <td class="mono">6:19</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=4rLW7zg21gI" target="_blank" rel="noopener noreferrer">Process vs Thread</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">3:51</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">05</span>Tail Latency Amplification &amp; Retry Storms</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=oQbUOnRhusM" target="_blank" rel="noopener noreferrer">How to Protect Your Backend from a Retry Storm</a></td>
-                <td>Software Developer Diaries</td>
-                <td class="mono">6:43</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=NByH-cau97A" target="_blank" rel="noopener noreferrer">Retry Strategies: Exponential Backoff &amp; Jitter</a></td>
-                <td>CodeLucky</td>
-                <td class="mono">4:28</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=1MJLfSZyp9A" target="_blank" rel="noopener noreferrer">System Meltdowns: From Retry Storms to Resilient Design</a></td>
-                <td>Last Mile Developer</td>
-                <td class="mono">9:02</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">06</span>Latency Numbers Every Programmer Should Know</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=FqR5vESuKe0" target="_blank" rel="noopener noreferrer">Latency Numbers Programmer Should Know</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">6:22</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=4JSN0VpEv2I" target="_blank" rel="noopener noreferrer">Latency Numbers Every Programmer Should Know — 1000x slow-down</a></td>
-                <td>Gaurav Sen</td>
-                <td class="mono">6:19</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ============== CLASS 04 ============== -->
-      <div class="resource-class" id="class-04">
-        <div class="resource-class-head">
-          <span class="class-num">CLASS 04</span>
-          <div class="class-info">
-            <div class="class-title">The Path of a Request</div>
-            <div class="class-summary">
-              DNS, edge proxies, load balancing, and the resilience patterns that protect what's behind them.
+        <!-- ============== CLASS 03 ============== -->
+        <div class="resource-class" id="class-03">
+          <div class="resource-class-head">
+            <span class="class-num">CLASS 03</span>
+            <div class="class-info">
+              <div class="class-title">Performance Fundamentals</div>
+              <div class="class-summary">
+                The vocabulary of fast systems — percentiles, queues, retries — and the napkin math that backs them.
+              </div>
             </div>
+          </div>
+
+          <div class="resource-topic" id="class-03-t01">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">01</span>Averages vs Percentiles (p50 / p95 / p99)
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=9rlGSahksLQ" target="_blank" rel="noopener noreferrer"
+                      >What are P50, P95, P99?</a
+                    >
+                  </td>
+                  <td>Kamran Ahmed</td>
+                  <td class="mono">1:28</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=3JdQOExKtUY" target="_blank" rel="noopener noreferrer"
+                      >Percentile Tail Latency Explained (95%, 99%)</a
+                    >
+                  </td>
+                  <td>Hussein Nasser</td>
+                  <td class="mono">6:15</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=lJ4NEMNBeS4" target="_blank" rel="noopener noreferrer"
+                      >Mastering Latency Metrics: P90, P95, P99</a
+                    >
+                  </td>
+                  <td>ByteMonk</td>
+                  <td class="mono">6:41</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-03-t02">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">02</span>Queueing, Little's Law, Saturation Curves
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=jeiQvHctlng" target="_blank" rel="noopener noreferrer"
+                      >Why Every (great) System Design Uses Queues</a
+                    >
+                  </td>
+                  <td>Arjay McCandless</td>
+                  <td class="mono">4:59</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=ErGP8kiLoC4" target="_blank" rel="noopener noreferrer"
+                      >The Math Behind System Design (That Nobody Talks About)</a
+                    >
+                  </td>
+                  <td>Rant &amp; Reload</td>
+                  <td class="mono">3:23</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=aVFF2hWy1-Y" target="_blank" rel="noopener noreferrer"
+                      >Little's Law Simple Form</a
+                    >
+                  </td>
+                  <td>Shrinivas Gondhalekar</td>
+                  <td class="mono">6:53</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=k_m3nEBR8jA" target="_blank" rel="noopener noreferrer"
+                      >Queues, Hockey Sticks and Performance</a
+                    >
+                  </td>
+                  <td>ScyllaDB (P99 CONF)</td>
+                  <td class="mono">15:24</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-03-t03">
+            <h3 class="resource-topic-title"><span class="topic-num">03</span>Back-of-Envelope / Napkin Math</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=UC5xf8FbdJc" target="_blank" rel="noopener noreferrer"
+                      >Back-Of-The-Envelope Estimation</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">8:32</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=0myM0k1mjZw" target="_blank" rel="noopener noreferrer"
+                      >How much data does YouTube store daily?</a
+                    >
+                  </td>
+                  <td>Gaurav Sen</td>
+                  <td class="mono">13:12</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-03-t04">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">04</span>Concurrency, Threads, Context Switching
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=RlM9AfWf1WU" target="_blank" rel="noopener noreferrer"
+                      >Concurrency Vs Parallelism</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">4:13</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=x-nM3PlmOB0" target="_blank" rel="noopener noreferrer"
+                      >Why More Threads Can Slow Down Servers</a
+                    >
+                  </td>
+                  <td>The Leap</td>
+                  <td class="mono">6:19</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=4rLW7zg21gI" target="_blank" rel="noopener noreferrer"
+                      >Process vs Thread</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">3:51</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-03-t05">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">05</span>Tail Latency Amplification &amp; Retry Storms
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=oQbUOnRhusM" target="_blank" rel="noopener noreferrer"
+                      >How to Protect Your Backend from a Retry Storm</a
+                    >
+                  </td>
+                  <td>Software Developer Diaries</td>
+                  <td class="mono">6:43</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=NByH-cau97A" target="_blank" rel="noopener noreferrer"
+                      >Retry Strategies: Exponential Backoff &amp; Jitter</a
+                    >
+                  </td>
+                  <td>CodeLucky</td>
+                  <td class="mono">4:28</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=1MJLfSZyp9A" target="_blank" rel="noopener noreferrer"
+                      >System Meltdowns: From Retry Storms to Resilient Design</a
+                    >
+                  </td>
+                  <td>Last Mile Developer</td>
+                  <td class="mono">9:02</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-03-t06">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">06</span>Latency Numbers Every Programmer Should Know
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=FqR5vESuKe0" target="_blank" rel="noopener noreferrer"
+                      >Latency Numbers Programmer Should Know</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">6:22</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=4JSN0VpEv2I" target="_blank" rel="noopener noreferrer"
+                      >Latency Numbers Every Programmer Should Know — 1000x slow-down</a
+                    >
+                  </td>
+                  <td>Gaurav Sen</td>
+                  <td class="mono">6:19</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">01</span>DNS Fundamentals (Resolution, TTL, Caching, Failover)</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=UVR9lhUGAyU" target="_blank" rel="noopener noreferrer">DNS Explained in 100 Seconds</a></td>
-                <td>Fireship</td>
-                <td class="mono">2:16</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=27r4Bzuj5NQ" target="_blank" rel="noopener noreferrer">Everything You Need to Know About DNS</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">5:45</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=mpQZVYPuDGU" target="_blank" rel="noopener noreferrer">How a DNS Server Works</a></td>
-                <td>PowerCert Animated Videos</td>
-                <td class="mono">6:05</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=GgYbplNqSHg" target="_blank" rel="noopener noreferrer">DNS Caching Explained</a></td>
-                <td>Tech for Senior</td>
-                <td class="mono">9:11</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">02</span>DNS TTL &amp; Traffic Shifting</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=lZXu5ymxeks" target="_blank" rel="noopener noreferrer">What is DNS TTL (Time to Live)?</a></td>
-                <td>DNSimple</td>
-                <td class="mono">4:39</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=B96iHaoJinY" target="_blank" rel="noopener noreferrer">DNS Explained — Stop Waiting 48 Hours for Changes</a></td>
-                <td>LearnThatStack</td>
-                <td class="mono">5:48</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=Z2b2JM9k4Ko" target="_blank" rel="noopener noreferrer">How Does DNS TTL Affect Record Updates?</a></td>
-                <td>Internet Infrastructure Explained</td>
-                <td class="mono">2:55</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=f3ulB43SaeY" target="_blank" rel="noopener noreferrer">Demystifying DNS: The Truth About DNS Propagation</a></td>
-                <td>openLI</td>
-                <td class="mono">6:45</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">03</span>Reverse Proxy (TLS Termination, Compression, Buffering, Routing)</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=RqfaTIWc3LQ" target="_blank" rel="noopener noreferrer">Reverse Proxy vs API Gateway vs Load Balancer</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">3:06</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=4NB0NDtOwIQ" target="_blank" rel="noopener noreferrer">Proxy vs Reverse Proxy (Real-world Examples)</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">5:17</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=xo5V9g9joFs" target="_blank" rel="noopener noreferrer">Proxy vs Reverse Proxy vs Load Balancer</a></td>
-                <td>TechWorld with Nana</td>
-                <td class="mono">13:19</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=acf5A-CbhbE" target="_blank" rel="noopener noreferrer">Reverse Proxy in 5 Minutes</a></td>
-                <td>The Coding Gopher</td>
-                <td class="mono">5:21</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">04</span>L4 vs L7 Load Balancing, Health Checks, Connection Draining</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=S4GsSTb4hxs" target="_blank" rel="noopener noreferrer">L4 vs L7 Load Balancing — System Design Tradeoffs</a></td>
-                <td>SoftwareDude</td>
-                <td class="mono">9:10</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=O_DfHBPYLTA" target="_blank" rel="noopener noreferrer">Layer 4 vs Layer 7 Load Balancer — Stop Guessing in Interviews</a></td>
-                <td>IT k Funde</td>
-                <td class="mono">12:36</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=WHDwVn7mkqA" target="_blank" rel="noopener noreferrer">Load Balancer Types Explained: Layer 4 vs Layer 7</a></td>
-                <td>CodeLucky</td>
-                <td class="mono">3:53</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=sCR3SAVdyCc" target="_blank" rel="noopener noreferrer">What is a Load Balancer?</a></td>
-                <td>IBM Technology</td>
-                <td class="mono">8:22</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">05</span>Retry, Timeout &amp; Circuit-Breaker Patterns</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=5_Bt_OEg0no" target="_blank" rel="noopener noreferrer">The Circuit Breaker Pattern — Resilient Microservices</a></td>
-                <td>Nick Chapsas</td>
-                <td class="mono">7:13</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=RfPNuaj5Ax0" target="_blank" rel="noopener noreferrer">Top 5 Microservices Resilience Patterns</a></td>
-                <td>ByteMonk</td>
-                <td class="mono">6:48</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=lc7-80HnNWk" target="_blank" rel="noopener noreferrer">Retry, Timeout, Circuit Breaker, Fallback</a></td>
-                <td>v11tv</td>
-                <td class="mono">8:36</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=m28VAy2yZsE" target="_blank" rel="noopener noreferrer">4 Traffic Failure Handling Patterns — Timeout, Retry, Jitter, Backoff</a></td>
-                <td>SoftwareDude</td>
-                <td class="mono">16:48</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">06</span>Sticky Sessions vs Stateless Services</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=20tpk8A_xa0" target="_blank" rel="noopener noreferrer">Stateful vs Stateless Architectures Explained</a></td>
-                <td>Hayk Simonyan</td>
-                <td class="mono">4:13</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=bHB3b2U2bxg" target="_blank" rel="noopener noreferrer">Load Balancing with Sticky Sessions</a></td>
-                <td>CodeMindsTV</td>
-                <td class="mono">6:33</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=1YX16xyp-Us" target="_blank" rel="noopener noreferrer">What Is Sticky Session Load Balancing?</a></td>
-                <td>Software Interviews Prep</td>
-                <td class="mono">6:38</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=fyTxwIa-1U0" target="_blank" rel="noopener noreferrer">Session vs JWT: The Differences You May Not Know</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">7:00</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ============== CLASS 05 ============== -->
-      <div class="resource-class" id="class-05">
-        <div class="resource-class-head">
-          <span class="class-num">CLASS 05</span>
-          <div class="class-info">
-            <div class="class-title">API Design</div>
-            <div class="class-summary">
-              The contract between client and server — REST/RPC/GraphQL trade-offs, idempotency, pagination, versioning, and error models.
+        <!-- ============== CLASS 04 ============== -->
+        <div class="resource-class" id="class-04">
+          <div class="resource-class-head">
+            <span class="class-num">CLASS 04</span>
+            <div class="class-info">
+              <div class="class-title">The Path of a Request</div>
+              <div class="class-summary">
+                DNS, edge proxies, load balancing, and the resilience patterns that protect what's behind them.
+              </div>
             </div>
+          </div>
+
+          <div class="resource-topic" id="class-04-t01">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">01</span>DNS Fundamentals (Resolution, TTL, Caching, Failover)
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=UVR9lhUGAyU" target="_blank" rel="noopener noreferrer"
+                      >DNS Explained in 100 Seconds</a
+                    >
+                  </td>
+                  <td>Fireship</td>
+                  <td class="mono">2:16</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=27r4Bzuj5NQ" target="_blank" rel="noopener noreferrer"
+                      >Everything You Need to Know About DNS</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:45</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=mpQZVYPuDGU" target="_blank" rel="noopener noreferrer"
+                      >How a DNS Server Works</a
+                    >
+                  </td>
+                  <td>PowerCert Animated Videos</td>
+                  <td class="mono">6:05</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=GgYbplNqSHg" target="_blank" rel="noopener noreferrer"
+                      >DNS Caching Explained</a
+                    >
+                  </td>
+                  <td>Tech for Senior</td>
+                  <td class="mono">9:11</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-04-t02">
+            <h3 class="resource-topic-title"><span class="topic-num">02</span>DNS TTL &amp; Traffic Shifting</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=lZXu5ymxeks" target="_blank" rel="noopener noreferrer"
+                      >What is DNS TTL (Time to Live)?</a
+                    >
+                  </td>
+                  <td>DNSimple</td>
+                  <td class="mono">4:39</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=B96iHaoJinY" target="_blank" rel="noopener noreferrer"
+                      >DNS Explained — Stop Waiting 48 Hours for Changes</a
+                    >
+                  </td>
+                  <td>LearnThatStack</td>
+                  <td class="mono">5:48</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=Z2b2JM9k4Ko" target="_blank" rel="noopener noreferrer"
+                      >How Does DNS TTL Affect Record Updates?</a
+                    >
+                  </td>
+                  <td>Internet Infrastructure Explained</td>
+                  <td class="mono">2:55</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=f3ulB43SaeY" target="_blank" rel="noopener noreferrer"
+                      >Demystifying DNS: The Truth About DNS Propagation</a
+                    >
+                  </td>
+                  <td>openLI</td>
+                  <td class="mono">6:45</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-04-t03">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">03</span>Reverse Proxy (TLS Termination, Compression, Buffering, Routing)
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=RqfaTIWc3LQ" target="_blank" rel="noopener noreferrer"
+                      >Reverse Proxy vs API Gateway vs Load Balancer</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">3:06</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=4NB0NDtOwIQ" target="_blank" rel="noopener noreferrer"
+                      >Proxy vs Reverse Proxy (Real-world Examples)</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:17</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=xo5V9g9joFs" target="_blank" rel="noopener noreferrer"
+                      >Proxy vs Reverse Proxy vs Load Balancer</a
+                    >
+                  </td>
+                  <td>TechWorld with Nana</td>
+                  <td class="mono">13:19</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=acf5A-CbhbE" target="_blank" rel="noopener noreferrer"
+                      >Reverse Proxy in 5 Minutes</a
+                    >
+                  </td>
+                  <td>The Coding Gopher</td>
+                  <td class="mono">5:21</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-04-t04">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">04</span>L4 vs L7 Load Balancing, Health Checks, Connection Draining
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=S4GsSTb4hxs" target="_blank" rel="noopener noreferrer"
+                      >L4 vs L7 Load Balancing — System Design Tradeoffs</a
+                    >
+                  </td>
+                  <td>SoftwareDude</td>
+                  <td class="mono">9:10</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=O_DfHBPYLTA" target="_blank" rel="noopener noreferrer"
+                      >Layer 4 vs Layer 7 Load Balancer — Stop Guessing in Interviews</a
+                    >
+                  </td>
+                  <td>IT k Funde</td>
+                  <td class="mono">12:36</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=WHDwVn7mkqA" target="_blank" rel="noopener noreferrer"
+                      >Load Balancer Types Explained: Layer 4 vs Layer 7</a
+                    >
+                  </td>
+                  <td>CodeLucky</td>
+                  <td class="mono">3:53</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=sCR3SAVdyCc" target="_blank" rel="noopener noreferrer"
+                      >What is a Load Balancer?</a
+                    >
+                  </td>
+                  <td>IBM Technology</td>
+                  <td class="mono">8:22</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-04-t05">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">05</span>Retry, Timeout &amp; Circuit-Breaker Patterns
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=5_Bt_OEg0no" target="_blank" rel="noopener noreferrer"
+                      >The Circuit Breaker Pattern — Resilient Microservices</a
+                    >
+                  </td>
+                  <td>Nick Chapsas</td>
+                  <td class="mono">7:13</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=RfPNuaj5Ax0" target="_blank" rel="noopener noreferrer"
+                      >Top 5 Microservices Resilience Patterns</a
+                    >
+                  </td>
+                  <td>ByteMonk</td>
+                  <td class="mono">6:48</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=lc7-80HnNWk" target="_blank" rel="noopener noreferrer"
+                      >Retry, Timeout, Circuit Breaker, Fallback</a
+                    >
+                  </td>
+                  <td>v11tv</td>
+                  <td class="mono">8:36</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=m28VAy2yZsE" target="_blank" rel="noopener noreferrer"
+                      >4 Traffic Failure Handling Patterns — Timeout, Retry, Jitter, Backoff</a
+                    >
+                  </td>
+                  <td>SoftwareDude</td>
+                  <td class="mono">16:48</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-04-t06">
+            <h3 class="resource-topic-title"><span class="topic-num">06</span>Sticky Sessions vs Stateless Services</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=20tpk8A_xa0" target="_blank" rel="noopener noreferrer"
+                      >Stateful vs Stateless Architectures Explained</a
+                    >
+                  </td>
+                  <td>Hayk Simonyan</td>
+                  <td class="mono">4:13</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=bHB3b2U2bxg" target="_blank" rel="noopener noreferrer"
+                      >Load Balancing with Sticky Sessions</a
+                    >
+                  </td>
+                  <td>CodeMindsTV</td>
+                  <td class="mono">6:33</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=1YX16xyp-Us" target="_blank" rel="noopener noreferrer"
+                      >What Is Sticky Session Load Balancing?</a
+                    >
+                  </td>
+                  <td>Software Interviews Prep</td>
+                  <td class="mono">6:38</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=fyTxwIa-1U0" target="_blank" rel="noopener noreferrer"
+                      >Session vs JWT: The Differences You May Not Know</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">7:00</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">01</span>API Design Best Practices (Use-Case First)</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=_gQaygjm_hg" target="_blank" rel="noopener noreferrer">Good APIs Vs Bad APIs: 7 Tips for API Design</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">5:48</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=BB1Y_wHyKGM" target="_blank" rel="noopener noreferrer">RESTful API Design Best Practices You Need To Know</a></td>
-                <td>apiguru</td>
-                <td class="mono">7:48</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=7QfswaV0re4" target="_blank" rel="noopener noreferrer">API Design 101: From Basics to Best Practices</a></td>
-                <td>Hayk Simonyan</td>
-                <td class="mono">5:39</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=7nm1pYuKAhY" target="_blank" rel="noopener noreferrer">Deep Dive into REST API Design Best Practices</a></td>
-                <td>Software Developer Diaries</td>
-                <td class="mono">12:02</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">02</span>REST vs RPC vs GraphQL Selection Criteria</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=yWzKJPw_VzM" target="_blank" rel="noopener noreferrer">What Is GraphQL? REST vs. GraphQL</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">5:15</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=veAb1fSp1Lk" target="_blank" rel="noopener noreferrer">tRPC, gRPC, GraphQL or REST: When to Use What?</a></td>
-                <td>Software Developer Diaries</td>
-                <td class="mono">10:46</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=PTfZcN20fro" target="_blank" rel="noopener noreferrer">GraphQL vs REST: Which is Better for APIs?</a></td>
-                <td>IBM Technology</td>
-                <td class="mono">7:31</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">03</span>Idempotency and Safe Retries</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=4OuaONkZw1I" target="_blank" rel="noopener noreferrer">Why Idempotency is Very Critical in Backend Applications</a></td>
-                <td>Hussein Nasser</td>
-                <td class="mono">8:59</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=XAccGbtl3Z8" target="_blank" rel="noopener noreferrer">Idempotency — What It Is and How to Implement It</a></td>
-                <td>Alex Hyett</td>
-                <td class="mono">8:05</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=t99NvIazD68" target="_blank" rel="noopener noreferrer">Idempotency in APIs: You Should Be Aware of This!</a></td>
-                <td>Software Developer Diaries</td>
-                <td class="mono">7:31</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=5_DyX3PnKxg" target="_blank" rel="noopener noreferrer">Why External APIs Break Idempotency</a></td>
-                <td>CodeOpinion</td>
-                <td class="mono">11:39</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">04</span>Pagination, Filtering, and Response Shape</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=14K_a2kKTxU" target="_blank" rel="noopener noreferrer">API Pagination: Making Billions of Products Scrolling Possible</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">3:12</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=6I_0v843lVE" target="_blank" rel="noopener noreferrer">Offset vs Cursor Based Pagination Explained</a></td>
-                <td>Animation Builders</td>
-                <td class="mono">4:15</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=WUICbOOtAic" target="_blank" rel="noopener noreferrer">Web API Pagination — Offset-based vs Cursor-based</a></td>
-                <td>Ambient Coder</td>
-                <td class="mono">11:03</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=zwDIN04lIpc" target="_blank" rel="noopener noreferrer">Pagination in MySQL — Offset vs. Cursor</a></td>
-                <td>PlanetScale</td>
-                <td class="mono">13:20</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">05</span>API Versioning Strategies</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=AkKGcJ7FWrM" target="_blank" rel="noopener noreferrer">Master API Versioning: 4 Key Strategies You Need to Know</a></td>
-                <td>apiguru</td>
-                <td class="mono">6:55</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=vsb4ZkUytrU" target="_blank" rel="noopener noreferrer">What is API Versioning? Two Strategies for Designing Better APIs</a></td>
-                <td>Erik Wilde</td>
-                <td class="mono">3:33</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=42J4KMHUJjE" target="_blank" rel="noopener noreferrer">REST API — Versioning REST APIs</a></td>
-                <td>TutorialsPoint</td>
-                <td class="mono">4:23</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=ySo4-G6Ycfw" target="_blank" rel="noopener noreferrer">Why You Should Version Your API Endpoints</a></td>
-                <td>Web Dev Cody</td>
-                <td class="mono">9:56</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">06</span>Error Models, Status Codes, and Backward Compatibility</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=qmpUfWN7hh4" target="_blank" rel="noopener noreferrer">HTTP Status Codes Explained In 5 Minutes</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">5:07</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=YJOgQToN3FE" target="_blank" rel="noopener noreferrer">What Are The Best Practices For API Error Handling?</a></td>
-                <td>Server Logic Simplified</td>
-                <td class="mono">4:47</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=G_HZtL8BpCA" target="_blank" rel="noopener noreferrer">API Error Handling: The Ultimate Beginner's Guide</a></td>
-                <td>CodeLucky</td>
-                <td class="mono">3:53</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=uvTT_0hqhyY" target="_blank" rel="noopener noreferrer">Handling HTTP API Errors with Problem Details</a></td>
-                <td>CodeOpinion</td>
-                <td class="mono">8:56</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">07</span>Bonus — Stripe API Design Patterns</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=tgDAFumt65o" target="_blank" rel="noopener noreferrer">Why Stripe's API Never Breaks — Date-Based Versioning</a></td>
-                <td>ByteMonk</td>
-                <td class="mono">12:37</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=IEe-5VOv0Js" target="_blank" rel="noopener noreferrer">The Principles Behind Great API Design</a></td>
-                <td>Stripe Sessions 2019</td>
-                <td class="mono">30:26</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ============== CLASS 06 ============== -->
-      <div class="resource-class" id="class-06">
-        <div class="resource-class-head">
-          <span class="class-num">CLASS 06</span>
-          <div class="class-info">
-            <div class="class-title">Schema Design &amp; Indexes <span class="upcoming-pill">Upcoming</span></div>
-            <div class="class-summary">
-              Query-first OLTP schema design, primary/composite keys, B-tree internals, write amplification, and the normalize-vs-denormalize call. Pre-reading for the upcoming class.
+        <!-- ============== CLASS 05 ============== -->
+        <div class="resource-class" id="class-05">
+          <div class="resource-class-head">
+            <span class="class-num">CLASS 05</span>
+            <div class="class-info">
+              <div class="class-title">API Design</div>
+              <div class="class-summary">
+                The contract between client and server — REST/RPC/GraphQL trade-offs, idempotency, pagination,
+                versioning, and error models.
+              </div>
             </div>
+          </div>
+
+          <div class="resource-topic" id="class-05-t01">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">01</span>API Design Best Practices (Use-Case First)
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=_gQaygjm_hg" target="_blank" rel="noopener noreferrer"
+                      >Good APIs Vs Bad APIs: 7 Tips for API Design</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:48</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=BB1Y_wHyKGM" target="_blank" rel="noopener noreferrer"
+                      >RESTful API Design Best Practices You Need To Know</a
+                    >
+                  </td>
+                  <td>apiguru</td>
+                  <td class="mono">7:48</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=7QfswaV0re4" target="_blank" rel="noopener noreferrer"
+                      >API Design 101: From Basics to Best Practices</a
+                    >
+                  </td>
+                  <td>Hayk Simonyan</td>
+                  <td class="mono">5:39</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=7nm1pYuKAhY" target="_blank" rel="noopener noreferrer"
+                      >Deep Dive into REST API Design Best Practices</a
+                    >
+                  </td>
+                  <td>Software Developer Diaries</td>
+                  <td class="mono">12:02</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-05-t02">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">02</span>REST vs RPC vs GraphQL Selection Criteria
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=yWzKJPw_VzM" target="_blank" rel="noopener noreferrer"
+                      >What Is GraphQL? REST vs. GraphQL</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:15</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=veAb1fSp1Lk" target="_blank" rel="noopener noreferrer"
+                      >tRPC, gRPC, GraphQL or REST: When to Use What?</a
+                    >
+                  </td>
+                  <td>Software Developer Diaries</td>
+                  <td class="mono">10:46</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=PTfZcN20fro" target="_blank" rel="noopener noreferrer"
+                      >GraphQL vs REST: Which is Better for APIs?</a
+                    >
+                  </td>
+                  <td>IBM Technology</td>
+                  <td class="mono">7:31</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-05-t03">
+            <h3 class="resource-topic-title"><span class="topic-num">03</span>Idempotency and Safe Retries</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=4OuaONkZw1I" target="_blank" rel="noopener noreferrer"
+                      >Why Idempotency is Very Critical in Backend Applications</a
+                    >
+                  </td>
+                  <td>Hussein Nasser</td>
+                  <td class="mono">8:59</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=XAccGbtl3Z8" target="_blank" rel="noopener noreferrer"
+                      >Idempotency — What It Is and How to Implement It</a
+                    >
+                  </td>
+                  <td>Alex Hyett</td>
+                  <td class="mono">8:05</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=t99NvIazD68" target="_blank" rel="noopener noreferrer"
+                      >Idempotency in APIs: You Should Be Aware of This!</a
+                    >
+                  </td>
+                  <td>Software Developer Diaries</td>
+                  <td class="mono">7:31</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=5_DyX3PnKxg" target="_blank" rel="noopener noreferrer"
+                      >Why External APIs Break Idempotency</a
+                    >
+                  </td>
+                  <td>CodeOpinion</td>
+                  <td class="mono">11:39</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-05-t04">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">04</span>Pagination, Filtering, and Response Shape
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=14K_a2kKTxU" target="_blank" rel="noopener noreferrer"
+                      >API Pagination: Making Billions of Products Scrolling Possible</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">3:12</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=6I_0v843lVE" target="_blank" rel="noopener noreferrer"
+                      >Offset vs Cursor Based Pagination Explained</a
+                    >
+                  </td>
+                  <td>Animation Builders</td>
+                  <td class="mono">4:15</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=WUICbOOtAic" target="_blank" rel="noopener noreferrer"
+                      >Web API Pagination — Offset-based vs Cursor-based</a
+                    >
+                  </td>
+                  <td>Ambient Coder</td>
+                  <td class="mono">11:03</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=zwDIN04lIpc" target="_blank" rel="noopener noreferrer"
+                      >Pagination in MySQL — Offset vs. Cursor</a
+                    >
+                  </td>
+                  <td>PlanetScale</td>
+                  <td class="mono">13:20</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-05-t05">
+            <h3 class="resource-topic-title"><span class="topic-num">05</span>API Versioning Strategies</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=AkKGcJ7FWrM" target="_blank" rel="noopener noreferrer"
+                      >Master API Versioning: 4 Key Strategies You Need to Know</a
+                    >
+                  </td>
+                  <td>apiguru</td>
+                  <td class="mono">6:55</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=vsb4ZkUytrU" target="_blank" rel="noopener noreferrer"
+                      >What is API Versioning? Two Strategies for Designing Better APIs</a
+                    >
+                  </td>
+                  <td>Erik Wilde</td>
+                  <td class="mono">3:33</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=42J4KMHUJjE" target="_blank" rel="noopener noreferrer"
+                      >REST API — Versioning REST APIs</a
+                    >
+                  </td>
+                  <td>TutorialsPoint</td>
+                  <td class="mono">4:23</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=ySo4-G6Ycfw" target="_blank" rel="noopener noreferrer"
+                      >Why You Should Version Your API Endpoints</a
+                    >
+                  </td>
+                  <td>Web Dev Cody</td>
+                  <td class="mono">9:56</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-05-t06">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">06</span>Error Models, Status Codes, and Backward Compatibility
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=qmpUfWN7hh4" target="_blank" rel="noopener noreferrer"
+                      >HTTP Status Codes Explained In 5 Minutes</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:07</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=YJOgQToN3FE" target="_blank" rel="noopener noreferrer"
+                      >What Are The Best Practices For API Error Handling?</a
+                    >
+                  </td>
+                  <td>Server Logic Simplified</td>
+                  <td class="mono">4:47</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=G_HZtL8BpCA" target="_blank" rel="noopener noreferrer"
+                      >API Error Handling: The Ultimate Beginner's Guide</a
+                    >
+                  </td>
+                  <td>CodeLucky</td>
+                  <td class="mono">3:53</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=uvTT_0hqhyY" target="_blank" rel="noopener noreferrer"
+                      >Handling HTTP API Errors with Problem Details</a
+                    >
+                  </td>
+                  <td>CodeOpinion</td>
+                  <td class="mono">8:56</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-05-t07">
+            <h3 class="resource-topic-title"><span class="topic-num">07</span>Bonus — Stripe API Design Patterns</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=tgDAFumt65o" target="_blank" rel="noopener noreferrer"
+                      >Why Stripe's API Never Breaks — Date-Based Versioning</a
+                    >
+                  </td>
+                  <td>ByteMonk</td>
+                  <td class="mono">12:37</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=IEe-5VOv0Js" target="_blank" rel="noopener noreferrer"
+                      >The Principles Behind Great API Design</a
+                    >
+                  </td>
+                  <td>Stripe Sessions 2019</td>
+                  <td class="mono">30:26</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">01</span>Query-First Schema Design for OLTP Workloads</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=s6m8Aby2at8" target="_blank" rel="noopener noreferrer">7 Database Design Mistakes to Avoid (With Solutions)</a></td>
-                <td>Database Star</td>
-                <td class="mono">11:29</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=tZsM9nN0SVQ" target="_blank" rel="noopener noreferrer">How To Design A Relational Database Schema</a></td>
-                <td>DbSchema Database Designer</td>
-                <td class="mono">9:55</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=v0WIMwA3d7c" target="_blank" rel="noopener noreferrer">DB Modelling: OLTP Database Design</a></td>
-                <td>Neelan Joachimpillai</td>
-                <td class="mono">11:30</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <!-- ============== CLASS 06 ============== -->
+        <div class="resource-class" id="class-06">
+          <div class="resource-class-head">
+            <span class="class-num">CLASS 06</span>
+            <div class="class-info">
+              <div class="class-title">Schema Design &amp; Indexes <span class="upcoming-pill">Upcoming</span></div>
+              <div class="class-summary">
+                Query-first OLTP schema design, primary/composite keys, B-tree internals, write amplification, and the
+                normalize-vs-denormalize call. Pre-reading for the upcoming class.
+              </div>
+            </div>
+          </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">02</span>Primary Keys, Composite Keys, Normalization Tradeoffs</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=RZjMbhLYesU" target="_blank" rel="noopener noreferrer">How To Design Primary Keys &amp; Make Your Database Faster</a></td>
-                <td>CockroachDB</td>
-                <td class="mono">6:10</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=2eHGcRHpNVU" target="_blank" rel="noopener noreferrer">How To Create Composite Keys (Primary Key)</a></td>
-                <td>The SQL Guy</td>
-                <td class="mono">6:56</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=GCA63syHvsk" target="_blank" rel="noopener noreferrer">Surrogate Key and Natural Key</a></td>
-                <td>Caleb Curry</td>
-                <td class="mono">7:34</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div class="resource-topic" id="class-06-t01">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">01</span>Query-First Schema Design for OLTP Workloads
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=s6m8Aby2at8" target="_blank" rel="noopener noreferrer"
+                      >7 Database Design Mistakes to Avoid (With Solutions)</a
+                    >
+                  </td>
+                  <td>Database Star</td>
+                  <td class="mono">11:29</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=tZsM9nN0SVQ" target="_blank" rel="noopener noreferrer"
+                      >How To Design A Relational Database Schema</a
+                    >
+                  </td>
+                  <td>DbSchema Database Designer</td>
+                  <td class="mono">9:55</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=v0WIMwA3d7c" target="_blank" rel="noopener noreferrer"
+                      >DB Modelling: OLTP Database Design</a
+                    >
+                  </td>
+                  <td>Neelan Joachimpillai</td>
+                  <td class="mono">11:30</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">03</span>Index Internals (B-Tree), Covering Indexes, Selectivity</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=K1a2Bk8NrYQ" target="_blank" rel="noopener noreferrer">Understanding B-Trees: The Data Structure Behind Modern Databases</a></td>
-                <td>Spanning Tree</td>
-                <td class="mono">12:39</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=BHCSL_ZifI0" target="_blank" rel="noopener noreferrer">DB Indexing in System Design Interviews — B-tree, Geospatial, Inverted Index</a></td>
-                <td>Hello Interview</td>
-                <td class="mono">14:16</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=fWZ2vkc0tYy" target="_blank" rel="noopener noreferrer">Are Multi-Column Indexes a Good Idea?</a></td>
-                <td>Supabase</td>
-                <td class="mono">11:22</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=pak2cPE1Y-g" target="_blank" rel="noopener noreferrer">Creating Covering Index to Eliminate Join</a></td>
-                <td>Pinal Dave</td>
-                <td class="mono">3:39</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div class="resource-topic" id="class-06-t02">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">02</span>Primary Keys, Composite Keys, Normalization Tradeoffs
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=RZjMbhLYesU" target="_blank" rel="noopener noreferrer"
+                      >How To Design Primary Keys &amp; Make Your Database Faster</a
+                    >
+                  </td>
+                  <td>CockroachDB</td>
+                  <td class="mono">6:10</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=2eHGcRHpNVU" target="_blank" rel="noopener noreferrer"
+                      >How To Create Composite Keys (Primary Key)</a
+                    >
+                  </td>
+                  <td>The SQL Guy</td>
+                  <td class="mono">6:56</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=GCA63syHvsk" target="_blank" rel="noopener noreferrer"
+                      >Surrogate Key and Natural Key</a
+                    >
+                  </td>
+                  <td>Caleb Curry</td>
+                  <td class="mono">7:34</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">04</span>Read/Write Amplification and Index Maintenance Costs</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=zN3UPWAZodk" target="_blank" rel="noopener noreferrer">The Database Index Lie: Why More Indexes Make You Slower</a></td>
-                <td>Why This in Tech?</td>
-                <td class="mono">5:35</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=BIlFTFrEFOI" target="_blank" rel="noopener noreferrer">SQL Indexing Best Practices — How to Make Your Database FASTER!</a></td>
-                <td>CockroachDB</td>
-                <td class="mono">4:08</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=LHUKI-Yr7Zo" target="_blank" rel="noopener noreferrer">Indexing Costs and Overhead</a></td>
-                <td>oracle ocm</td>
-                <td class="mono">4:40</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=jsWwFL_iqVM" target="_blank" rel="noopener noreferrer">Write Amplification Explained</a></td>
-                <td>Hussein Nasser</td>
-                <td class="mono">21:35</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div class="resource-topic" id="class-06-t03">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">03</span>Index Internals (B-Tree), Covering Indexes, Selectivity
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=K1a2Bk8NrYQ" target="_blank" rel="noopener noreferrer"
+                      >Understanding B-Trees: The Data Structure Behind Modern Databases</a
+                    >
+                  </td>
+                  <td>Spanning Tree</td>
+                  <td class="mono">12:39</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=BHCSL_ZifI0" target="_blank" rel="noopener noreferrer"
+                      >DB Indexing in System Design Interviews — B-tree, Geospatial, Inverted Index</a
+                    >
+                  </td>
+                  <td>Hello Interview</td>
+                  <td class="mono">14:16</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=fWZ2vkc0tYy" target="_blank" rel="noopener noreferrer"
+                      >Are Multi-Column Indexes a Good Idea?</a
+                    >
+                  </td>
+                  <td>Supabase</td>
+                  <td class="mono">11:22</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=pak2cPE1Y-g" target="_blank" rel="noopener noreferrer"
+                      >Creating Covering Index to Eliminate Join</a
+                    >
+                  </td>
+                  <td>Pinal Dave</td>
+                  <td class="mono">3:39</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">05</span>EXPLAIN Plans, Query Tuning</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=BHwzDmr6d7s" target="_blank" rel="noopener noreferrer">Secret To Optimizing SQL Queries — Understand The SQL Execution Order</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">5:57</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=P7EUFtjeAmI" target="_blank" rel="noopener noreferrer">Postgres Explain Explained — How Databases Prepare Optimal Query Plans</a></td>
-                <td>Hussein Nasser</td>
-                <td class="mono">10:17</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=NkXxRodAFUY" target="_blank" rel="noopener noreferrer">How to Read an Execution Plan: Databases for Developers</a></td>
-                <td>The Magic of SQL</td>
-                <td class="mono">9:34</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=GA8SaXDLdsY" target="_blank" rel="noopener noreferrer">SQL Query Optimization Tips</a></td>
-                <td>Cody Baldwin</td>
-                <td class="mono">3:18</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <div class="resource-topic" id="class-06-t04">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">04</span>Read/Write Amplification and Index Maintenance Costs
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=zN3UPWAZodk" target="_blank" rel="noopener noreferrer"
+                      >The Database Index Lie: Why More Indexes Make You Slower</a
+                    >
+                  </td>
+                  <td>Why This in Tech?</td>
+                  <td class="mono">5:35</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=BIlFTFrEFOI" target="_blank" rel="noopener noreferrer"
+                      >SQL Indexing Best Practices — How to Make Your Database FASTER!</a
+                    >
+                  </td>
+                  <td>CockroachDB</td>
+                  <td class="mono">4:08</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=LHUKI-Yr7Zo" target="_blank" rel="noopener noreferrer"
+                      >Indexing Costs and Overhead</a
+                    >
+                  </td>
+                  <td>oracle ocm</td>
+                  <td class="mono">4:40</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=jsWwFL_iqVM" target="_blank" rel="noopener noreferrer"
+                      >Write Amplification Explained</a
+                    >
+                  </td>
+                  <td>Hussein Nasser</td>
+                  <td class="mono">21:35</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div class="resource-topic">
-          <h3 class="resource-topic-title"><span class="topic-num">06</span>Normalization vs Denormalization (When to Duplicate)</h3>
-          <table class="data-table">
-            <thead>
-              <tr><th>Title</th><th>Channel</th><th>Duration</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=d1GGBDI2ixg" target="_blank" rel="noopener noreferrer">Database Normalization vs Denormalization Explained</a></td>
-                <td>programmerCave</td>
-                <td class="mono">7:00</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=n6aUmJbf51o" target="_blank" rel="noopener noreferrer">Normalization vs Denormalization — The Art of System Design</a></td>
-                <td>Software Interviews Prep</td>
-                <td class="mono">6:31</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=W_5vn8TBLys" target="_blank" rel="noopener noreferrer">Data Normalization vs Denormalization — Which is Better When?</a></td>
-                <td>IT k Funde</td>
-                <td class="mono">12:28</td>
-              </tr>
-              <tr>
-                <td><a href="https://www.youtube.com/watch?v=_1IKwnbscQU" target="_blank" rel="noopener noreferrer">7 Must-Know Strategies to Scale Your Database</a></td>
-                <td>ByteByteGo</td>
-                <td class="mono">8:42</td>
-              </tr>
-            </tbody>
-          </table>
+          <div class="resource-topic" id="class-06-t05">
+            <h3 class="resource-topic-title"><span class="topic-num">05</span>EXPLAIN Plans, Query Tuning</h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=BHwzDmr6d7s" target="_blank" rel="noopener noreferrer"
+                      >Secret To Optimizing SQL Queries — Understand The SQL Execution Order</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">5:57</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=P7EUFtjeAmI" target="_blank" rel="noopener noreferrer"
+                      >Postgres Explain Explained — How Databases Prepare Optimal Query Plans</a
+                    >
+                  </td>
+                  <td>Hussein Nasser</td>
+                  <td class="mono">10:17</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=NkXxRodAFUY" target="_blank" rel="noopener noreferrer"
+                      >How to Read an Execution Plan: Databases for Developers</a
+                    >
+                  </td>
+                  <td>The Magic of SQL</td>
+                  <td class="mono">9:34</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=GA8SaXDLdsY" target="_blank" rel="noopener noreferrer"
+                      >SQL Query Optimization Tips</a
+                    >
+                  </td>
+                  <td>Cody Baldwin</td>
+                  <td class="mono">3:18</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="resource-topic" id="class-06-t06">
+            <h3 class="resource-topic-title">
+              <span class="topic-num">06</span>Normalization vs Denormalization (When to Duplicate)
+            </h3>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Channel</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=d1GGBDI2ixg" target="_blank" rel="noopener noreferrer"
+                      >Database Normalization vs Denormalization Explained</a
+                    >
+                  </td>
+                  <td>programmerCave</td>
+                  <td class="mono">7:00</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=n6aUmJbf51o" target="_blank" rel="noopener noreferrer"
+                      >Normalization vs Denormalization — The Art of System Design</a
+                    >
+                  </td>
+                  <td>Software Interviews Prep</td>
+                  <td class="mono">6:31</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=W_5vn8TBLys" target="_blank" rel="noopener noreferrer"
+                      >Data Normalization vs Denormalization — Which is Better When?</a
+                    >
+                  </td>
+                  <td>IT k Funde</td>
+                  <td class="mono">12:28</td>
+                </tr>
+                <tr>
+                  <td>
+                    <a href="https://www.youtube.com/watch?v=_1IKwnbscQU" target="_blank" rel="noopener noreferrer"
+                      >7 Must-Know Strategies to Scale Your Database</a
+                    >
+                  </td>
+                  <td>ByteByteGo</td>
+                  <td class="mono">8:42</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
+      <!-- /.resource-main -->
     </section>
 
-    <footer class="site-footer">
-      TJIP Phase 02 — External videos. Curated, not authored.
-    </footer>
+    <footer class="site-footer">TJIP Phase 02 — External videos. Curated, not authored.</footer>
+
+    <script>
+      (function () {
+        const groups = Array.from(document.querySelectorAll(".resource-toc .toc-group"));
+        const classBlocks = Array.from(document.querySelectorAll(".resource-main .resource-class"));
+        if (!groups.length || !classBlocks.length) return;
+
+        const validClassIds = new Set(classBlocks.map((el) => el.id));
+        const DEFAULT_CLASS = classBlocks[0].id;
+
+        // Derive the active class id from a hash. Hash may be:
+        //   #foundations            -> foundations
+        //   #class-03               -> class-03
+        //   #foundations-p2         -> foundations  (topic anchor; class derived)
+        //   #class-04-t05           -> class-04
+        function classFromHash(hash) {
+          const id = (hash || "").replace(/^#/, "");
+          if (!id) return null;
+          if (validClassIds.has(id)) return id;
+          // Topic id: strip the trailing -tNN or -pN segment.
+          const m = id.match(/^(.+?)(?:-t\d+|-p\d+)$/);
+          if (m && validClassIds.has(m[1])) return m[1];
+          return null;
+        }
+
+        let activeTopicLink = null;
+        const tocLinks = Array.from(document.querySelectorAll(".resource-toc li a"));
+
+        function setActive(classId, opts) {
+          opts = opts || {};
+          if (!validClassIds.has(classId)) classId = DEFAULT_CLASS;
+          classBlocks.forEach((el) => el.classList.toggle("is-visible", el.id === classId));
+          groups.forEach((g) => g.classList.toggle("is-active", g.dataset.class === classId));
+          // Clear stale topic highlight when class changes.
+          if (activeTopicLink) {
+            activeTopicLink.classList.remove("active");
+            activeTopicLink = null;
+          }
+          const main = document.querySelector(".resource-main");
+          if (opts.scrollTo) {
+            const target = document.getElementById(opts.scrollTo);
+            if (target) {
+              // Wait one frame so the newly-shown class is laid out before we scroll.
+              requestAnimationFrame(() => target.scrollIntoView({ block: "start", behavior: "smooth" }));
+            }
+          } else if (opts.scrollTop) {
+            // On desktop, .resource-main is the scroll container so reset it to top.
+            // On mobile it flows in the page, so scroll the newly-active class block
+            // into view (window scroll). scroll-margin-top accounts for the sticky bars.
+            const mainScrolls = main && main.scrollHeight > main.clientHeight + 1;
+            if (mainScrolls) {
+              main.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              const target = document.getElementById(classId);
+              if (target) {
+                requestAnimationFrame(() =>
+                  target.scrollIntoView({ block: "start", behavior: "smooth" }),
+                );
+              }
+            }
+          }
+        }
+
+        // Initial state from hash.
+        const initialHash = (location.hash || "").replace(/^#/, "");
+        const initialClass = classFromHash(location.hash) || DEFAULT_CLASS;
+        const initialTopic = initialHash && initialHash !== initialClass ? initialHash : null;
+        setActive(initialClass, initialTopic ? { scrollTo: initialTopic } : {});
+
+        // Sidebar click handling.
+        document.querySelector(".resource-toc nav").addEventListener("click", (e) => {
+          const a = e.target.closest("a");
+          if (!a) return;
+          const href = a.getAttribute("href") || "";
+          if (!href.startsWith("#")) return;
+          const targetClass = classFromHash(href);
+          if (!targetClass) return;
+          e.preventDefault();
+          const targetId = href.slice(1);
+          const isTopic = targetId !== targetClass;
+          if (history.pushState) history.pushState(null, "", href);
+          else location.hash = href;
+          setActive(targetClass, isTopic ? { scrollTo: targetId } : { scrollTop: true });
+        });
+
+        // Browser back / forward.
+        window.addEventListener("hashchange", () => {
+          const c = classFromHash(location.hash) || DEFAULT_CLASS;
+          const id = (location.hash || "").replace(/^#/, "");
+          const isTopic = id && id !== c;
+          setActive(c, isTopic ? { scrollTo: id } : {});
+        });
+
+        // Scrollspy — highlight the topic link of the currently visible topic within the active class.
+        // Root is .resource-main because that's the scroll container now (not the viewport).
+        const mainEl = document.querySelector(".resource-main");
+        if ("IntersectionObserver" in window && mainEl) {
+          const topicEls = Array.from(document.querySelectorAll(".resource-main .resource-topic"));
+          const linkForId = new Map(tocLinks.map((a) => [a.getAttribute("href").slice(1), a]));
+          const io = new IntersectionObserver(
+            (entries) => {
+              const visible = entries
+                .filter((e) => e.isIntersecting)
+                .map((e) => ({ el: e.target, top: e.boundingClientRect.top }))
+                .sort((a, b) => a.top - b.top);
+              if (!visible.length) return;
+              const link = linkForId.get(visible[0].el.id);
+              if (!link || link === activeTopicLink) return;
+              if (activeTopicLink) activeTopicLink.classList.remove("active");
+              activeTopicLink = link;
+              link.classList.add("active");
+            },
+            { root: mainEl, rootMargin: "-15% 0px -70% 0px", threshold: 0 },
+          );
+          topicEls.forEach((t) => io.observe(t));
+        }
+      })();
+    </script>
   </body>
 </html>

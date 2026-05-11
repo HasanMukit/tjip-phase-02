@@ -35,7 +35,7 @@ Every topic lives in exactly one theme. A topic's class assignment is metadata (
 ## 2. Durable conventions — do not change without user approval
 
 ### 2.1 Topic page anatomy
-1. `<nav class="site-nav">` with four links: Themes, Classes, Case Studies, Glossary.
+1. `<nav class="site-nav">` with five links — **Themes, Classes, Case Studies, Glossary, Resources** — plus the `.site-search` box on the right (input + hidden results panel). Every page carries the same nav block; mark the current page's link with `class="active"`.
 2. `<header>` containing:
    - Eyebrow with breadcrumb back to theme: `<div class="eyebrow"><a href="index.html">← {Theme name}</a></div>`
    - `<h1>` with one word italicized via `<em>`.
@@ -129,7 +129,14 @@ Don't reinvent — these are in `styles.css`:
 
 SVG text uses `.svg-text`, `.svg-text-bold`, `.svg-text-muted`, `.svg-text-small`, `.ring-line`. Color tokens are CSS vars: `--ink`, `--paper`, `--paper-warm`, `--paper-card`, `--rule`, `--muted`, `--accent`, `--accent-soft`, `--s1`–`--s4` (with `-soft` variants).
 
-The mobile breakpoint is `max-width: 640px`. Anything new needs a responsive override there if it doesn't degrade gracefully by default.
+**Breakpoints in use.** Most responsive overrides live at `max-width: 640px` (the primary mobile breakpoint). Two narrower-scope breakpoints exist for nav/resources behavior only — don't introduce more without asking:
+
+- `max-width: 380px` — micro-breakpoint for the nav search box and links on very narrow phones.
+- `max-width: 1023px` / `min-width: 1024px` — used by `resources.html` to switch between the desktop 2-pane layout and the mobile chip-bar layout (see §2.7).
+
+**Responsive nav.** Below 640px, `.site-nav-inner` wraps onto two rows: the logo + `.site-search` stay on top, while `.site-nav-links` drops to a second row (`order: 3; flex-basis: 100%`) and scrolls horizontally with hidden scrollbars (`overflow-x: auto`, vendor-prefixed scrollbar hiders). The search input shrinks (`width: 160px`, expanding to `200px` on focus) and the results panel is pinned to `right: 0` so it doesn't overflow the viewport. At ≤380px the search shrinks further and link spacing tightens. Keep any new nav additions inside `.site-nav-inner` so they participate in this layout.
+
+Anything new needs a responsive override at 640px if it doesn't degrade gracefully by default.
 
 ### 2.7 `resources.html` — standalone, off the graph
 
@@ -140,16 +147,30 @@ The mobile breakpoint is `max-width: 640px`. Anything new needs a responsive ove
 - **No glossary entries** for terms that only show up here. Glossary scope (§2.3) stays strict — videos are external, not authored content.
 - **Outbound links go off-site only** (YouTube). Every title link uses `target="_blank" rel="noopener noreferrer"`.
 
-Page anatomy:
+Page anatomy (top to bottom):
 1. Standard `site-nav` (with `Resources` marked `class="active"` here).
-2. `<section class="hero">` — same shape as `classes.html`.
-3. `<section class="resource-jump">` — "Jump to class" grid linking to each `#class-NN` anchor.
-4. `<section class="classes-section">` containing one `<div class="resource-class" id="class-NN">` per class. Each holds a `.resource-class-head` (class number + title + summary) and one `.resource-topic` per topic. Each topic has an `<h3 class="resource-topic-title">` and one `.data-table` with three columns: **Title** (URL embedded, opens in new tab), **Channel**, **Duration** (`td.mono`).
-5. Footer.
+2. `<section class="classes-section">` — the whole body of the page. **No hero, no separate "jump to class" grid.** Navigation lives entirely in the sidebar TOC, which doubles as the mobile chip bar.
+   - `<aside class="resource-toc">` — sidebar TOC. Wraps a `.resource-toc-inner` containing a `.resource-toc-label` and a `<nav>` of `.toc-group[data-class="..."]` blocks. Each group has an `<a class="toc-class" href="#class-NN">` row and a `<ul>` of topic links (`href="#class-NN-tMM"` or `#foundations-pN`). The `data-class` attribute is what the JS uses to mark the active group.
+   - `<div class="resource-main">` — right column. Holds one optional `<div class="resource-class" id="foundations">` for pre-class / primer material (currently: a beginner SQL track) followed by one `<div class="resource-class" id="class-NN">` per class. Each `.resource-class` holds a `.resource-class-head` (sticky to the top of the main column, with class number + title + summary) and one `.resource-topic` per topic. **Every `.resource-topic` must carry a stable id** — `class-NN-tMM` for class topics, `foundations-pN` for the foundations block — so the sidebar can link to it and the scrollspy can match. Each topic has an `<h3 class="resource-topic-title">` and one `.data-table` with three columns: **Title** (URL embedded, opens in new tab), **Channel**, **Duration** (`td.mono`). Desktop table is fixed-layout with 60/28/12 widths; mobile (≤640px) collapses each row into a stacked card.
+3. Footer.
+4. Inline `<script>` (see "Behavior" below) — must remain at the end of `<body>` after the markup.
 
-When a new class lands and ships videos, add a new `<div class="resource-class" id="class-NN">` block here AND a matching `<a href="#class-NN">` in the jump grid. That's it — do not touch search, glossary, or any other page.
+**Behavior — focus mode + locked viewport.** This page does not scroll the whole document the way other pages do. The script enforces these invariants:
 
-If a class is taught but its video list isn't ready yet (or the reverse: videos prepared before class), mark it with `<span class="upcoming-pill">Upcoming</span>` next to the class title and a one-line note in the summary.
+- Only one `.resource-class` is visible in `.resource-main` at a time. The sidebar always lists every class, but the main column hides all `.resource-class` blocks except the one with `.is-visible`. Clicking a class link (or a topic link) sets the active class. The script reads the URL hash on load and treats `#foundations`, `#class-03`, `#class-NN-tMM`, `#foundations-pN` etc. as routes — topic hashes derive the class via a regex (`-tNN`/`-pN` suffix).
+- On desktop (`min-width: 1024px`), `<body>` is `display: flex; flex-direction: column; height: 100vh; overflow: hidden;`. The `.classes-section` is a 2-column grid (`240px minmax(0, 1fr)`, gap 56px) that fills the remaining height; both the `.resource-toc` and `.resource-main` columns scroll independently with themed scrollbars. `overscroll-behavior: contain` prevents scroll chaining to the page.
+- Below 1024px the locked-viewport CSS is dropped. `.classes-section` becomes a single column, the sidebar turns into a sticky horizontal **chip bar** (`top: 56px`, below the nav) showing class-level links only — topic `<ul>`s collapse via `display: none`. `.resource-class-head` is no longer sticky on mobile. `.resource-class` and `.resource-topic` use `scroll-margin-top: 110px` so jumps land below the chip bar.
+- The script also runs an `IntersectionObserver` scrollspy *inside* `.resource-main` (not the viewport) that highlights the topic link of the currently visible `.resource-topic` within the active class. Class navigation is hash-based; topic highlight is scroll-based.
+
+When a new class lands and ships videos:
+1. Add a `<div class="resource-class" id="class-NN">` block inside `.resource-main`, after the previous class.
+2. Add a matching `<div class="toc-group" data-class="class-NN">` to the sidebar `<nav>` — a `.toc-class` link plus a `<ul>` with one `<li><a href="#class-NN-tMM">` per topic.
+3. Give every new `.resource-topic` a stable `id="class-NN-tMM"` (zero-padded; matches the sidebar links).
+4. If the videos are queued before the class is taught (or vice versa), mark it with `<span class="upcoming-pill">Upcoming</span>` next to the class title and a one-line note in the summary.
+
+Do not touch search, glossary, or any other page. Do not re-introduce a hero or a separate jump-grid — the sidebar/chip bar replaces both.
+
+The optional `#foundations` block is the **only** non-class section allowed on this page. Keep it above Class 03 if present, and follow the same sidebar-group pattern (`data-class="foundations"`, topic ids `foundations-pN`).
 
 ---
 
